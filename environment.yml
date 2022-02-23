@@ -1,0 +1,28 @@
+name: CLIPRCNN
+channels:
+  - pytorch
+dependencies:
+  - python=3.8
+  - pytorch
+  - torchvision
+  - torchaudio
+  - cudatoolkit=11.3
+  - numpy
+  - pip
+  - pandas
+  - matplotlib
+  - cython
+  - pip:
+    - transformers
+    - torchsummary
+    - albumentations
+    - opencv-python
+    - tensorboard
+    - "git+https://github.com/philferriere/cocoapi.git#subdirectory=PythonAPI"
+    - torchsummary
+    - fiftyone
+    - "git+https://github.com/openai/CLIP.git"
+    - ftfy
+    - regex
+    - tqdm
+    - jupyter

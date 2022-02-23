@@ -125,11 +125,11 @@ def evaluate(model, data_loader, device):
 from torch.utils.tensorboard import SummaryWriter
 from model import test_backbone
 
-def train_model(model, train_dataset, validation_dataset, num_epochs=4, MODEL_TYPE='Custom-Vanilla'): #'CLIP-FRCNN'  #  Vanilla, Custom-Vanilla, or CLIP-FRCNN):
+def train_model(model, train_dataset, validation_dataset, num_epochs=4, MODEL_TYPE='Custom-Vanilla', batch_size = config.BATCH_SIZE): #'CLIP-FRCNN'  #  Vanilla, Custom-Vanilla, or CLIP-FRCNN):
     # define training and validation data loaders
     train_data_loader = torch.utils.data.DataLoader(
         train_dataset,
-        batch_size=config.BATCH_SIZE,
+        batch_size=batch_size,
         shuffle=True,
         num_workers=0,
         pin_memory=True,
@@ -138,7 +138,7 @@ def train_model(model, train_dataset, validation_dataset, num_epochs=4, MODEL_TY
 
     valid_data_loader = torch.utils.data.DataLoader(
         validation_dataset,
-        batch_size=config.BATCH_SIZE,
+        batch_size=batch_size,
         shuffle=False,
         num_workers=0,
         pin_memory=True,
