@@ -135,12 +135,9 @@ class test_backbone():
 
 class CLIPHead(nn.Module):
     """
-    Standard heads for FPN-based models
+    heads for FPN-based models
 
-    Args:
-        in_channels (int): number of input channels
-        representation_size (int): size of the intermediate representation
-    """
+"""
 
     def __init__(self,):
         super(CLIPHead, self).__init__()
