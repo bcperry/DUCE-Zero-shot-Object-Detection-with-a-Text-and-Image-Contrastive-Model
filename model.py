@@ -154,7 +154,7 @@ class CLIPHead(nn.Module):
     def __init__(self, ):
         super(CLIPHead, self).__init__()
         CLIP_model, _ = clip.load("RN50", device=config.DEVICE)
-        self.image_embedder = list(CLIP_model.visual.children())[-1].cuda().eval()
+        self.image_embedder = list(CLIP_model.visual.children())[-1].cuda().eval().float()
         del CLIP_model
 
     def forward(self, x):
@@ -182,7 +182,7 @@ class CLIPRCNNPredictor(nn.Module):
         self.text_features = CLIP_model.encode_text(text).to(config.DEVICE).float()
         self.text_features /= self.text_features.norm(dim=-1, keepdim=True)
 
-        self.bbox_pred = nn.Linear(in_channels, (len(text)*4)).to(config.DEVICE)
+        self.bbox_pred = nn.Linear(in_channels, (len(text)*4)).to(config.DEVICE).float()
         del CLIP_model
 
     def forward(self, x):
