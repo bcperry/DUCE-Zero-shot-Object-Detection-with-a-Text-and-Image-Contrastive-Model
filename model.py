@@ -120,6 +120,11 @@ def create_model(model_type='Vanilla', classes=[]):
             with autocast():
                 model.roi_heads.box_head = CLIPHead()
                 model.roi_heads.box_predictor = CLIPRCNNPredictor(1024, classes)  # CLIP embeds into 1024 dimensions for the RN50 implementation
+
+            #we do not want to train the predictor since it is embedding into CLIP space
+            for child in model.roi_heads.box_head.children():
+                for p in child.parameters():
+                    p.requires_grad = False
         model.float()
     return model
 
@@ -128,9 +133,10 @@ class test_backbone():
     def __init__(self, ):
         self.CLIP_model, preprocess = clip.load("RN50", device=config.DEVICE)
         self.CLIP_model.eval()
+        self.CLIP_model.float()
 
         self.test_image = preprocess(Image.open(os.path.join('test.jpg')).convert("RGB")).unsqueeze(0).to(config.DEVICE)
-        self.image_embedder = list(self.CLIP_model.visual.children())[-1].float().cuda().eval()  # take the last layer manually
+        self.image_embedder = list(self.CLIP_model.visual.children())[-1].float().cuda().eval().float()  # take the last layer manually
         self.CLIP_image_features = self.CLIP_model.encode_image(self.test_image)
 
     def test(self, model):
