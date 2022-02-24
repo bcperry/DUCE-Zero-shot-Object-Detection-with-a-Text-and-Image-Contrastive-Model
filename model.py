@@ -120,7 +120,7 @@ def create_model(model_type='Vanilla', classes=[]):
             with autocast():
                 model.roi_heads.box_head = CLIPHead()
                 model.roi_heads.box_predictor = CLIPRCNNPredictor(1024, classes)  # CLIP embeds into 1024 dimensions for the RN50 implementation
-
+        model.float()
     return model
 
 
@@ -128,8 +128,9 @@ class test_backbone():
     def __init__(self, ):
         self.CLIP_model, preprocess = clip.load("RN50", device=config.DEVICE)
         self.CLIP_model.eval()
+
         self.test_image = preprocess(Image.open(os.path.join('test.jpg')).convert("RGB")).unsqueeze(0).to(config.DEVICE)
-        self.image_embedder = list(self.CLIP_model.visual.children())[-1].cuda().eval()  # take the last layer manually
+        self.image_embedder = list(self.CLIP_model.visual.children())[-1].float().cuda().eval()  # take the last layer manually
         self.CLIP_image_features = self.CLIP_model.encode_image(self.test_image)
 
     def test(self, model):
@@ -170,11 +171,12 @@ class CLIPRCNNPredictor(nn.Module):
         super(CLIPRCNNPredictor, self).__init__()
         CLIP_model, _ = clip.load("RN50", device=config.DEVICE)
         CLIP_model.eval()
+        CLIP_model.float()
 
-        self.text_features = CLIP_model.encode_text(text)
+        self.text_features = CLIP_model.encode_text(text).to(config.DEVICE).float()
         self.text_features /= self.text_features.norm(dim=-1, keepdim=True)
 
-        self.bbox_pred = nn.Linear(in_channels, 4)
+        self.bbox_pred = nn.Linear(in_channels, (len(text)*4)).to(config.DEVICE)
         del CLIP_model
 
     def forward(self, x):
