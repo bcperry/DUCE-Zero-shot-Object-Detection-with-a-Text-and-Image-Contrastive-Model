@@ -78,6 +78,7 @@ def _get_iou_types(model):
         iou_types.append("keypoints")
     return iou_types
 
+from torch.cuda.amp import autocast
 
 @torch.inference_mode()
 def evaluate(model, data_loader, device):
@@ -99,6 +100,7 @@ def evaluate(model, data_loader, device):
         if torch.cuda.is_available():
             torch.cuda.synchronize()
         model_time = time.time()
+
         outputs = model(images)
 
 
@@ -161,9 +163,11 @@ def train_model(model, train_dataset, validation_dataset, num_epochs=4, MODEL_TY
     # Writer will output to ./runs/ directory by default
     writer = SummaryWriter()
 
+    scaler = torch.cuda.amp.GradScaler()
+
     for epoch in range(num_epochs):
         # train for one epoch, printing every 10 iterations
-        training_metrics = train_one_epoch(model, optimizer, train_data_loader, config.DEVICE, epoch, print_freq=10, training=True)
+        training_metrics = train_one_epoch(model, optimizer, train_data_loader, config.DEVICE, epoch, print_freq=10, training=True, scaler=scaler)
 
         if MODEL_TYPE == 'CLIP-FRCNN':  # check that we dont change the weights from the backbone
             weight_tester.test(model)
@@ -173,7 +177,7 @@ def train_model(model, train_dataset, validation_dataset, num_epochs=4, MODEL_TY
 
         # train for one epoch, printing every 10 iterations
         eval_metrics = train_one_epoch(model, optimizer, valid_data_loader, config.DEVICE, epoch, print_freq=100,
-                                  training=False)
+                                  training=False, scaler=scaler)
         # update the learning rate
         lr_scheduler.step(eval_metrics.meters['loss'].avg)
 

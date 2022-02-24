@@ -14,7 +14,7 @@ from utils import FeatureExtractor
 from torchvision.models.detection import FasterRCNN
 from torchvision.models.detection.rpn import AnchorGenerator
 from torchvision.models.detection.faster_rcnn import FastRCNNPredictor
-
+from torch.cuda.amp import autocast
 
 def create_model(model_type='Vanilla', classes=[]):
     if model_type == 'Vanilla':
@@ -70,8 +70,9 @@ def create_model(model_type='Vanilla', classes=[]):
 
     if model_type == 'CLIP-Backbone-FRCNN' or model_type == 'CLIP-FRCNN':
         # Load clip backbone and feature extractor
-        model, preprocess = clip.load("RN50")
-        model.half().eval().cuda()
+        model, preprocess = clip.load("RN50", device=config.DEVICE)
+        model.eval()
+        model.float()
 
         del model.visual.attnpool  # delete the attention pool, so that we can feed the model larger images
         model.visual.attnpool = nn.Identity()  # add an Identity layer so that we can use the model, else it complains
@@ -113,20 +114,20 @@ def create_model(model_type='Vanilla', classes=[]):
                            box_roi_pool=roi_pooler,
                            image_mean=config.MEAN,
                            image_std=config.STD,
-                           ).half().to(config.DEVICE)
+                           ).to(config.DEVICE)
 
         if model_type == 'CLIP-FRCNN':
-            model.roi_heads.box_head = CLIPHead()
-            model.roi_heads.box_predictor = CLIPRCNNPredictor(1024,
-                                                              classes)  # CLIP embeds into 1024 dimensions for the RN50 implementation
+            with autocast():
+                model.roi_heads.box_head = CLIPHead()
+                model.roi_heads.box_predictor = CLIPRCNNPredictor(1024, classes)  # CLIP embeds into 1024 dimensions for the RN50 implementation
 
     return model
 
 
 class test_backbone():
     def __init__(self, ):
-        self.CLIP_model, preprocess = clip.load("RN50")
-        self.CLIP_model.half().eval()
+        self.CLIP_model, preprocess = clip.load("RN50", device=config.DEVICE)
+        self.CLIP_model.eval()
         self.test_image = preprocess(Image.open(os.path.join('test.jpg')).convert("RGB")).unsqueeze(0).to(config.DEVICE)
         self.image_embedder = list(self.CLIP_model.visual.children())[-1].cuda().eval()  # take the last layer manually
         self.CLIP_image_features = self.CLIP_model.encode_image(self.test_image)
@@ -145,7 +146,7 @@ class CLIPHead(nn.Module):
 
     def __init__(self, ):
         super(CLIPHead, self).__init__()
-        CLIP_model, _ = clip.load("RN50")
+        CLIP_model, _ = clip.load("RN50", device=config.DEVICE)
         self.image_embedder = list(CLIP_model.visual.children())[-1].cuda().eval()
         del CLIP_model
 
@@ -167,8 +168,8 @@ class CLIPRCNNPredictor(nn.Module):
 
     def __init__(self, in_channels, text):
         super(CLIPRCNNPredictor, self).__init__()
-        CLIP_model, _ = clip.load("RN50")
-        CLIP_model.eval().half().to(config.DEVICE)
+        CLIP_model, _ = clip.load("RN50", device=config.DEVICE)
+        CLIP_model.eval()
 
         self.text_features = CLIP_model.encode_text(text)
         self.text_features /= self.text_features.norm(dim=-1, keepdim=True)
