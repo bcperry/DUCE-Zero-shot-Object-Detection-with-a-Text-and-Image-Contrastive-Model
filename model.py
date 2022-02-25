@@ -179,7 +179,7 @@ class CLIPRCNNPredictor(nn.Module):
         CLIP_model.eval()
         CLIP_model.float()
 
-        self.text_features = CLIP_model.encode_text(text).to(config.DEVICE).float()
+        self.text_features = CLIP_model.encode_text(text).detach().to(config.DEVICE).float()
         self.text_features /= self.text_features.norm(dim=-1, keepdim=True)
 
         self.bbox_pred = nn.Linear(in_channels, (len(text)*4)).to(config.DEVICE).float()
