@@ -1,6 +1,7 @@
 import datetime
 import errno
 import os
+import random
 import time
 from collections import defaultdict, deque
 
@@ -12,6 +13,16 @@ from typing import Dict, Iterable, Callable
 from torch import Tensor
 
 def collate_fn(batch):
+    valid = []
+    replace = []
+    for image in range(len(batch)):
+        if len(batch[image][1]['boxes']) != 0: #make sure the image has some bbox
+            valid.append(image)
+        else:
+            replace.append(image)
+    if len(valid) != len(batch):
+        for bad in replace:
+            batch[bad] = batch[random.choice(valid)]
     return tuple(zip(*batch))
 
 class FeatureExtractor(nn.Module):

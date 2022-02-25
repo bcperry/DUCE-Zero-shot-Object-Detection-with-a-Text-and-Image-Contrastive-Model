@@ -71,6 +71,9 @@ class FiftyOneTorchDataset(torch.utils.data.Dataset):
         target["area"] = torch.as_tensor(area, dtype=torch.float32)
         target["iscrowd"] = torch.as_tensor(iscrowd, dtype=torch.int64)
 
+        if len(target['boxes']) == 0:
+            test = 1
+
         if self.transforms is not None:
             img, target = self.transforms(img, target)
 
