@@ -135,7 +135,8 @@ def train_model(model, train_dataset, validation_dataset, num_epochs=4, MODEL_TY
         shuffle=True,
         num_workers=0,
         pin_memory=True,
-        collate_fn=utils.collate_fn
+        collate_fn=utils.collate_fn,
+        drop_last=True
     )
 
     valid_data_loader = torch.utils.data.DataLoader(
@@ -144,7 +145,8 @@ def train_model(model, train_dataset, validation_dataset, num_epochs=4, MODEL_TY
         shuffle=False,
         num_workers=0,
         pin_memory=True,
-        collate_fn=utils.collate_fn
+        collate_fn=utils.collate_fn,
+        drop_last=True
     )
     if MODEL_TYPE=='CLIP-FRCNN':
         weight_tester = test_backbone()
@@ -169,8 +171,8 @@ def train_model(model, train_dataset, validation_dataset, num_epochs=4, MODEL_TY
         # train for one epoch, printing every 10 iterations
         training_metrics = train_one_epoch(model, optimizer, train_data_loader, config.DEVICE, epoch, print_freq=10, training=True, scaler=scaler)
 
-        if MODEL_TYPE == 'CLIP-FRCNN':  # check that we dont change the weights from the backbone
-            weight_tester.test(model)
+        # if MODEL_TYPE == 'CLIP-FRCNN':  # check that we dont change the weights from the backbone
+        #     weight_tester.test(model)
 
         # evaluate on the test dataset
         evaluate(model, valid_data_loader, device=config.DEVICE)
