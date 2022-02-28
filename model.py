@@ -125,6 +125,9 @@ def create_model(model_type='Vanilla', classes=[]):
             for child in model.roi_heads.box_head.children():
                 for p in child.parameters():
                     p.requires_grad = False
+            # replace the loss function with one that ignores classification loss
+            torchvision.models.detection.roi_heads.fastrcnn_loss = cliprcnn_loss
+
         model.float()
     return model
 
@@ -181,8 +184,7 @@ class CLIPRCNNPredictor(nn.Module):
 
         self.text_features = CLIP_model.encode_text(text).detach().to(config.DEVICE).float()
         self.text_features /= self.text_features.norm(dim=-1, keepdim=True)
-
-        self.bbox_pred = nn.Linear(in_channels, (len(text)*4)).to(config.DEVICE).float()
+        self.bbox_pred = self._create_regressor(in_channels, 1024, (len(text)*4)).to(config.DEVICE).float()
         del CLIP_model
 
     def forward(self, x):
@@ -194,3 +196,52 @@ class CLIPRCNNPredictor(nn.Module):
         bbox_deltas = self.bbox_pred(x)
 
         return scores, bbox_deltas
+
+    def _create_regressor(self, in_channels, projection_dim, out_channels):
+
+        return nn.Sequential(
+            nn.Flatten(),
+            nn.Linear(in_channels, projection_dim),
+            nn.Dropout(0.0),
+            nn.LeakyReLU(0.1),
+            nn.Linear(projection_dim, out_channels),
+        )
+
+
+import torch.nn.functional as F
+def cliprcnn_loss(class_logits, box_regression, labels, regression_targets):
+    # type: (Tensor, Tensor, List[Tensor], List[Tensor]) -> Tuple[Tensor, Tensor]
+    """
+    Computes the loss for CLIP Faster R-CNN.
+
+    Args:
+        class_logits (Tensor)
+        box_regression (Tensor)
+        labels (list[BoxList])
+        regression_targets (Tensor)
+
+    Returns:
+        classification_loss (Tensor)
+        box_loss (Tensor)
+    """
+
+    labels = torch.cat(labels, dim=0)
+    regression_targets = torch.cat(regression_targets, dim=0)
+
+    # get indices that correspond to the regression targets for
+    # the corresponding ground truth labels, to be used with
+    # advanced indexing
+    sampled_pos_inds_subset = torch.where(labels > 0)[0]
+    labels_pos = labels[sampled_pos_inds_subset]
+    N, num_classes = class_logits.shape
+    box_regression = box_regression.reshape(N, box_regression.size(-1) // 4, 4)
+
+    box_loss = F.smooth_l1_loss(
+        box_regression[sampled_pos_inds_subset, labels_pos],
+        regression_targets[sampled_pos_inds_subset],
+        beta=1 / 9,
+        reduction='sum',
+    )
+    box_loss = box_loss / labels.numel()
+
+    return 0, box_loss
