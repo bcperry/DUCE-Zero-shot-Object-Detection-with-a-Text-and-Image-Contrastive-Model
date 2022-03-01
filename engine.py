@@ -156,7 +156,7 @@ def train_model(model, train_dataset, validation_dataset, num_epochs=4, MODEL_TY
 
     params = [p for p in model.parameters() if p.requires_grad]
     # check if vanilla has trainable params
-    optimizer = torch.optim.SGD(params, lr=config.LEARNING_RATE, momentum=0.9, weight_decay=config.WEIGHT_DECAY)
+    optimizer = torch.optim.Adam(params, lr=config.LEARNING_RATE, weight_decay=config.WEIGHT_DECAY)
 
     # create the learning rate schedule
     lr_scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, patience=3)

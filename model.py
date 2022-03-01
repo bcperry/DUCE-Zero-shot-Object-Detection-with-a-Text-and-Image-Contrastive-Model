@@ -108,12 +108,16 @@ def create_model(model_type='Vanilla', classes=[]):
                                                         output_size=7,
                                                         sampling_ratio=8)
 
+        #see args in faster rcnn
         model = FasterRCNN(backbone,
                            num_classes=len(classes),
                            rpn_anchor_generator=anchor_generator,
                            box_roi_pool=roi_pooler,
                            image_mean=config.MEAN,
                            image_std=config.STD,
+                           rpn_fg_iou_thresh = .95,
+                           rpn_bg_iou_thresh = .05,
+
                            ).to(config.DEVICE)
 
         if model_type == 'CLIP-FRCNN':
