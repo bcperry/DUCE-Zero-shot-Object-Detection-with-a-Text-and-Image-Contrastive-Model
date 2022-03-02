@@ -117,6 +117,8 @@ def create_model(model_type='Vanilla', classes=[]):
                            image_std=config.STD,
                            rpn_fg_iou_thresh = .95,
                            rpn_bg_iou_thresh = .05,
+                           rpn_nms_thresh = .7,
+                           rpn_score_thresh = .99,
 
                            ).to(config.DEVICE)
 
