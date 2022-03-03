@@ -116,16 +116,18 @@ def create_model(model_type='Vanilla', classes=[]):
                            image_mean=config.MEAN,
                            image_std=config.STD,
                            rpn_fg_iou_thresh = .95,
-                           rpn_bg_iou_thresh = .05,
+                           rpn_bg_iou_thresh = .45,
                            rpn_nms_thresh = .7,
-                           rpn_score_thresh = .99,
+                           rpn_score_thresh = .9,
 
                            ).to(config.DEVICE)
 
         if model_type == 'CLIP-FRCNN':
             with autocast():
+
                 model.roi_heads.box_head = CLIPHead()
                 model.roi_heads.box_predictor = CLIPRCNNPredictor(1024, classes)  # CLIP embeds into 1024 dimensions for the RN50 implementation
+
 
             #we do not want to train the predictor since it is embedding into CLIP space
             for child in model.roi_heads.box_head.children():
@@ -133,7 +135,6 @@ def create_model(model_type='Vanilla', classes=[]):
                     p.requires_grad = False
             # replace the loss function with one that ignores classification loss
             torchvision.models.detection.roi_heads.fastrcnn_loss = cliprcnn_loss
-
         model.float()
     return model
 
@@ -190,18 +191,23 @@ class CLIPRCNNPredictor(nn.Module):
 
         self.text_features = CLIP_model.encode_text(text).detach().to(config.DEVICE).float()
         self.text_features /= self.text_features.norm(dim=-1, keepdim=True)
-        self.bbox_pred = self._create_regressor(in_channels, 1024, (len(text)*4)).to(config.DEVICE).float()
+        #use 8 here so that we can drop the background later
+        self.bbox_pred = self._create_regressor(in_channels, 1024, 4).to(config.DEVICE).float()
         del CLIP_model
 
     def forward(self, x):
         if x.dim() == 4:
             assert list(x.shape[2:]) == [1, 1]
         x = x.flatten(start_dim=1)
-        # TODO: scores should be the logits, roi_heads takes the logits and performs the softmax.  It also drops all of the first row (assumed to be background)
+        # TODO: scores should be the logits, roi_heads takes the logits and performs the softmax.  It also drops all of the first column (assumed to be background)
         scores = (100.0 * x @ self.text_features.T)
         bbox_deltas = self.bbox_pred(x)
 
-        return scores, bbox_deltas
+        expanded_deltas = bbox_deltas
+        for _ in range(len(self.text_features)-1):
+            expanded_deltas = torch.cat((expanded_deltas, bbox_deltas), 1) # this helps us to perform evaluation without serious surgery to the model
+
+        return scores, expanded_deltas
 
     def _create_regressor(self, in_channels, projection_dim, out_channels):
 

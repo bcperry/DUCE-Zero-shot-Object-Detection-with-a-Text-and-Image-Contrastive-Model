@@ -146,8 +146,8 @@ def train_model(model, train_dataset, validation_dataset, num_epochs=4, MODEL_TY
         collate_fn=utils.collate_fn,
         drop_last=True
     )
-    if MODEL_TYPE=='CLIP-FRCNN':
-        weight_tester = test_backbone()
+    # if MODEL_TYPE=='CLIP-FRCNN':
+    #     weight_tester = test_backbone()
 
     print("Using device %s" % config.DEVICE)
 
@@ -159,7 +159,7 @@ def train_model(model, train_dataset, validation_dataset, num_epochs=4, MODEL_TY
     optimizer = torch.optim.Adam(params, lr=config.LEARNING_RATE, weight_decay=config.WEIGHT_DECAY)
 
     # create the learning rate schedule
-    lr_scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, patience=3)
+    #lr_scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, patience=3)
     # Writer will output to ./runs/ directory by default
     writer = SummaryWriter()
 
@@ -179,7 +179,7 @@ def train_model(model, train_dataset, validation_dataset, num_epochs=4, MODEL_TY
         eval_metrics = train_one_epoch(model, optimizer, valid_data_loader, config.DEVICE, epoch, print_freq=100,
                                   training=False, scaler=scaler)
         # update the learning rate
-        lr_scheduler.step(eval_metrics.meters['loss'].avg)
+        #lr_scheduler.step(eval_metrics.meters['loss'].avg)
 
         #training metrics
         # write to tensorboard
