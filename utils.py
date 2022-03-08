@@ -476,7 +476,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 from matplotlib.patches import Rectangle
 
-def plot_image(image, boxes, class_labels):
+def plot_image(image, boxes, class_labels, show = True):
     cmap = plt.get_cmap("tab20b")
     colors = [cmap(i) for i in np.linspace(0, 1, len(class_labels))]
     im = np.array(image)
@@ -517,9 +517,20 @@ def plot_image(image, boxes, class_labels):
             verticalalignment="top",
             bbox={"color": colors[int(class_pred)], "pad": 0},
         )
-    plt.show()
+    fig.canvas.draw()
+    data = np.frombuffer(fig.canvas.tostring_rgb(), dtype=np.uint8)
+    w, h = fig.canvas.get_width_height()
+    im = data.reshape((int(h), int(w), -1))
 
-def evaluate(image, labels, model):
+    if show:
+        plt.show()
+    else:
+        plt.close()
+    return im
+
+def evaluate(image, labels, model, iou_thresh, conf_thresh, show = True):
+
+
     #run the image through the model
     outputs = model(image)
 
@@ -529,6 +540,7 @@ def evaluate(image, labels, model):
     bboxes = np.insert(bboxes, 1, outputs[0]['scores'].detach().cpu().numpy(), axis=1)
     bboxes = list(bboxes)
 
-    nms_boxes = non_max_suppression(bboxes,0.5,0.2)
+    nms_boxes = non_max_suppression(bboxes, iou_thresh, conf_thresh)
 
-    plot_image(image.detach().cpu()[0].permute(1,2,0), nms_boxes, labels)
+    im = plot_image(image.detach().cpu()[0].permute(1,2,0), nms_boxes, labels, show)
+    return im
