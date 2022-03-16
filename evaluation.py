@@ -64,10 +64,12 @@ def eval(item_list, image_dir = None, rpn_score_thresh = 0.05, iou_thresh = .2, 
 
         images.append(test_transforms(image, [0,0,0,0])[0].to(config.DEVICE))
 
-    for image in (images):
+    for number, image in enumerate(images):
         image_out = evaluate(image.unsqueeze(0), item_list, clip_frcnn_model, iou_thresh, conf_thresh)
-    plt.imsave('output.jpg',image_out)
+        plt.imsave(f'./test_images/eval/output_image{number}.jpg',image_out)
 
 if __name__ == "__main__":
-    classes = ['flag', 'person', 'helmet', 'astronaut', 'space shuttle', 'camera']
-    eval(classes)
+    classes = ['flag', 'person', 'helmet', 'basket ball', 'baseball glove', 'astronaut', 'space shuttle', 'camera', 'train', 'Helicopter', 'T-72 tank', 'football helmet', 'soccer ball', 'baseball bat', 'tennis racket', 'cleats shoes', 'boxing gloves', 'man reading a newspaper', 'bike', 'newspaper', 'baby sitting in a swing', 'tree', 'grass', 'sky', 'road']
+    image_dir = r'./test_images'
+    eval(classes, iou_thresh=.01, conf_thresh=.9, image_dir=image_dir)
+
