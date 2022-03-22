@@ -22,18 +22,21 @@ def eval(item_list, image_dir = None, rpn_score_thresh = 0.05, iou_thresh = .2, 
     MODEL_EPOCH = MODEL_EPOCH
 
 
-    CHECKPOINT_NAME = f'{MODEL_TYPE}_epoch_{MODEL_EPOCH}.pth'
-
     # tokenize item list for CLIP
     if item_list[0] != '':
          item_list.insert(0,' ')
 
     text_tokens = clip.tokenize(["This is " + desc for desc in item_list]).cuda()
 
+
+    CHECKPOINT_NAME = f'{MODEL_TYPE}_trained.pth'
     checkpoint = torch.load(CHECKPOINT_NAME)
     clip_frcnn_model = create_model(MODEL_TYPE, classes=text_tokens)
 
-    clip_frcnn_model.load_state_dict(checkpoint)
+    clip_frcnn_model.load_state_dict(checkpoint['model_state_dict'])
+    epoch = checkpoint['epoch']
+    print(f'loaded checkpoint at epoch {epoch}')
+
     clip_frcnn_model.eval()
 
     clip_frcnn_model.rpn.score_thresh = rpn_score_thresh
@@ -67,6 +70,8 @@ def eval(item_list, image_dir = None, rpn_score_thresh = 0.05, iou_thresh = .2, 
     for number, image in enumerate(images):
         image_out = evaluate(image.unsqueeze(0), item_list, clip_frcnn_model, iou_thresh, conf_thresh)
         plt.imsave(f'./test_images/eval/output_image{number}.jpg',image_out)
+
+    del clip_frcnn_model
 
 if __name__ == "__main__":
     classes = ['flag', 'person', 'helmet', 'basket ball', 'baseball glove', 'astronaut', 'space shuttle', 'camera', 'train', 'Helicopter', 'T-72 tank', 'football helmet', 'soccer ball', 'baseball bat', 'tennis racket', 'cleats shoes', 'boxing gloves', 'man reading a newspaper', 'bike', 'newspaper', 'baby sitting in a swing', 'tree', 'grass', 'sky', 'road']

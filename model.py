@@ -218,9 +218,9 @@ class CLIPRCNNPredictor(nn.Module):
         return nn.Sequential(
             nn.Flatten(),
             nn.Linear(in_channels, projection_dim),
-            nn.ReLU(),
+            nn.LeakyReLU(0.1),
             nn.Linear(projection_dim, projection_dim),
-            nn.ReLU(),
+            nn.LeakyReLU(0.1),
             nn.Linear(projection_dim, out_channels),
         )
 
