@@ -126,13 +126,16 @@ def create_model(model_type='Vanilla', classes=[]):
             with autocast():
 
                 model.roi_heads.box_head = CLIPHead()
-                model.roi_heads.box_predictor = CLIPRCNNPredictor(1024, classes)  # CLIP embeds into 1024 dimensions for the RN50 implementation
+                model.roi_heads.box_predictor = CLIPRCNNPredictor((2048*7*7), classes)  # CLIP space is 2048*7*7 for the RN50 implementation
 
 
             #we do not want to train the predictor since it is embedding into CLIP space
             for child in model.roi_heads.box_head.children():
                 for p in child.parameters():
                     p.requires_grad = False
+
+
+
             # replace the loss function with one that ignores classification loss
             torchvision.models.detection.roi_heads.fastrcnn_loss = cliprcnn_loss
         model.float()
@@ -157,19 +160,19 @@ class test_backbone():
 
 class CLIPHead(nn.Module):
     """
+    This class gets the features from the pooled Regions of Interest, for the custom method using CLIP, we simply pass the roi on through
     heads for FPN-based models
-
 """
 
     def __init__(self, ):
         super(CLIPHead, self).__init__()
-        CLIP_model, _ = clip.load("RN50", device=config.DEVICE)
-        self.image_embedder = list(CLIP_model.visual.children())[-1].cuda().eval().float()
-        del CLIP_model
+        # CLIP_model, _ = clip.load("RN50", device=config.DEVICE)  # load in the CLIP model so that we can get the embedding layer
+        # self.image_embedder = list(CLIP_model.visual.children())[-1].cuda().eval().float()  #take the embedding layer
+        # del CLIP_model
 
     def forward(self, x):
-        x = self.image_embedder(x)
-        x /= x.norm(dim=-1, keepdim=True)
+        # x = self.image_embedder(x) #embed the ROI in CLIP space
+        # x /= x.norm(dim=-1, keepdim=True) #normalize the embedded image
         return x
 
 
@@ -189,21 +192,22 @@ class CLIPRCNNPredictor(nn.Module):
         CLIP_model.eval()
         CLIP_model.float()
 
+        self.image_embedder = list(CLIP_model.visual.children())[-1].cuda().eval().float()  # take the embedding layer
         self.text_features = CLIP_model.encode_text(text).detach().to(config.DEVICE).float()
         self.text_features /= self.text_features.norm(dim=-1, keepdim=True)
-        #use 8 here so that we can drop the background later
+
         self.bbox_pred = self._create_regressor(in_channels, 1024, 4).to(config.DEVICE).float()
         del CLIP_model
 
     def forward(self, x):
-        if x.dim() == 4:
-            assert list(x.shape[2:]) == [1, 1]
-        x = x.flatten(start_dim=1)
-        # TODO: scores should be the logits, roi_heads takes the logits and performs the softmax.  It also drops all of the first column (assumed to be background)
-        scores = (100.0 * x @ self.text_features.T)
+        image_features = self.image_embedder(x) #embed the ROI in CLIP space
+        image_features /= image_features.norm(dim=-1, keepdim=True) #normalize the embedded image
+
+        # NOTE: scores should be the logits, roi_heads.py takes the logits and performs the softmax.  It also drops all of the first column (assumed to be background)
+        scores = (100.0 * image_features @ self.text_features.T)
         bbox_deltas = self.bbox_pred(x)
 
-        expanded_deltas = bbox_deltas
+        expanded_deltas = bbox_deltas # this section will copy the bbox deltas num_classes times
         for _ in range(len(self.text_features)-1):
             expanded_deltas = torch.cat((expanded_deltas, bbox_deltas), 1) # this helps us to perform evaluation without serious surgery to the model
 
@@ -214,8 +218,9 @@ class CLIPRCNNPredictor(nn.Module):
         return nn.Sequential(
             nn.Flatten(),
             nn.Linear(in_channels, projection_dim),
-            nn.Dropout(0.0),
-            nn.LeakyReLU(0.1),
+            nn.ReLU(),
+            nn.Linear(projection_dim, projection_dim),
+            nn.ReLU(),
             nn.Linear(projection_dim, out_channels),
         )
 
