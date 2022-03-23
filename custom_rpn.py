@@ -97,26 +97,28 @@ class ZeroShotOD(nn.Module):
             features = OrderedDict([('0', features)])
         proposals, proposal_losses = self.rpn(images, features, targets)
 
-        with torch.no_grad():
+        detections = []
+        if not self.training:
+            with torch.no_grad():
 
-            box_features = self.box_roi_pool(features, proposals, images.image_sizes)
-            class_logits = self.classifier(box_features)
-            pred_scores = F.softmax(class_logits, -1)
-            class_pred = pred_scores.argmax(-1)
-            class_score = pred_scores.max(-1).values
+                box_features = self.box_roi_pool(features, proposals, images.image_sizes)
+                class_logits = self.classifier(box_features)
+                pred_scores = F.softmax(class_logits, -1)
+                class_pred = pred_scores.argmax(-1)
+                class_score = pred_scores.max(-1).values
 
-            boxes_per_image = [boxes_in_image.shape[0] for boxes_in_image in proposals]
-            pred_class_list = class_pred.split(boxes_per_image, 0)
-            pred_scores_list = class_score.split(boxes_per_image, 0)
-            detections = []
+                boxes_per_image = [boxes_in_image.shape[0] for boxes_in_image in proposals]
+                pred_class_list = class_pred.split(boxes_per_image, 0)
+                pred_scores_list = class_score.split(boxes_per_image, 0)
 
-            i=0
-            while i < len(images.image_sizes):
-                detections.append({'boxes': proposals[i], 'labels': pred_class_list[i], 'scores': pred_scores_list[i]})
-                i+=1
 
-            #detections needs to create a dict of tensors: boxes, labels, and scores
-            detections = self.transform.postprocess(detections, images.image_sizes, original_image_sizes)
+                i=0
+                while i < len(images.image_sizes):
+                    detections.append({'boxes': proposals[i], 'labels': pred_class_list[i], 'scores': pred_scores_list[i]})
+                    i+=1
+
+                #detections needs to create a dict of tensors: boxes, labels, and scores
+                detections = self.transform.postprocess(detections, images.image_sizes, original_image_sizes)
 
         losses = {}
         losses.update(proposal_losses)

@@ -177,7 +177,7 @@ def train_model(model, train_dataset, validation_dataset, num_epochs=4, MODEL_TY
         optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
         epoch = checkpoint['epoch'] + 1
         print(f'Loaded model epoch {epoch}')
-
+    best_loss = 9999
     while epoch < num_epochs:
 
         # train for one epoch, printing every 10 iterations
@@ -213,12 +213,14 @@ def train_model(model, train_dataset, validation_dataset, num_epochs=4, MODEL_TY
         writer.add_scalar('Loss/Objectness Evaluation Loss', eval_metrics.meters['loss_objectness'].avg, global_step=(epoch))
         writer.add_scalar('Loss/RPN Box Regressor Evaluation Loss', eval_metrics.meters['loss_rpn_box_reg'].avg,
                           global_step=(epoch))
-
-        torch.save({'epoch': epoch,
-                    'model_state_dict': model.state_dict(),
-                    'optimizer_state_dict': optimizer.state_dict(),
-                    'epoch': epoch},
-                   f'{MODEL_TYPE}_{WEIGHTS_NAME}.pth')
+        if eval_metrics.meters['loss'].avg <= best_loss:
+            torch.save({'epoch': epoch,
+                        'model_state_dict': model.state_dict(),
+                        'optimizer_state_dict': optimizer.state_dict(),
+                        'epoch': epoch},
+                       f'{MODEL_TYPE}_{WEIGHTS_NAME}.pth')
+            print(f'Saving epoch {epoch}')
+            best_loss = eval_metrics.meters['loss'].avg
 
         epoch += 1
 
