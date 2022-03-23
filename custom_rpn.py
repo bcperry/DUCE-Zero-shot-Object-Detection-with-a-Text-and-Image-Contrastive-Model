@@ -110,8 +110,10 @@ class ZeroShotOD(nn.Module):
             pred_scores_list = class_score.split(boxes_per_image, 0)
             detections = []
 
-            for i in range(len(images.image_sizes)-1):
+            i=0
+            while i < len(images.image_sizes):
                 detections.append({'boxes': proposals[i], 'labels': pred_class_list[i], 'scores': pred_scores_list[i]})
+                i+=1
 
             #detections needs to create a dict of tensors: boxes, labels, and scores
             detections = self.transform.postprocess(detections, images.image_sizes, original_image_sizes)
