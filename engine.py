@@ -128,7 +128,7 @@ def evaluate(model, data_loader, device):
 from torch.utils.tensorboard import SummaryWriter
 from model import test_backbone
 
-def train_model(model, train_dataset, validation_dataset, num_epochs=4, MODEL_TYPE='Custom-Vanilla', batch_size = config.BATCH_SIZE, CONTINUE_TRAINING = False): #'CLIP-FRCNN'  #  Vanilla, Custom-Vanilla, or CLIP-FRCNN):
+def train_model(model, train_dataset, validation_dataset, num_epochs=4, MODEL_TYPE='Custom-Vanilla', batch_size = config.BATCH_SIZE, WEIGHTS_NAME = "weights", CONTINUE_TRAINING = False): #'CLIP-FRCNN'  #  Vanilla, Custom-Vanilla, or CLIP-FRCNN):
     # define training and validation data loaders
     train_data_loader = torch.utils.data.DataLoader(
         train_dataset,
@@ -171,11 +171,12 @@ def train_model(model, train_dataset, validation_dataset, num_epochs=4, MODEL_TY
     epoch=0
 
     if CONTINUE_TRAINING:
-        CHECKPOINT_NAME = f'{MODEL_TYPE}_trained.pth'
+        CHECKPOINT_NAME = f'{MODEL_TYPE}_{WEIGHTS_NAME}.pth'
         checkpoint = torch.load(CHECKPOINT_NAME)
         model.load_state_dict(checkpoint['model_state_dict'])
         optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
         epoch = checkpoint['epoch'] + 1
+
     while epoch < num_epochs:
 
         # train for one epoch, printing every 10 iterations
@@ -216,7 +217,7 @@ def train_model(model, train_dataset, validation_dataset, num_epochs=4, MODEL_TY
                     'model_state_dict': model.state_dict(),
                     'optimizer_state_dict': optimizer.state_dict(),
                     'epoch': epoch},
-                   f'{MODEL_TYPE}_trained.pth')
+                   f'{MODEL_TYPE}_{WEIGHTS_NAME}.pth')
 
         epoch += 1
 
