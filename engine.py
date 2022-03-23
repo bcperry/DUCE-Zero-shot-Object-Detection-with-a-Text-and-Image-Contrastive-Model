@@ -37,7 +37,7 @@ def train_one_epoch(model, optimizer, data_loader, device, epoch, print_freq, sc
         with torch.cuda.amp.autocast(enabled=scaler is not None):
             loss_dict = model(images, targets)
 
-            del loss_dict['loss_classifier'] #for the CLIP model, we do not use classification loss
+            #del loss_dict['loss_classifier'] #for the CLIP model, we do not use classification loss
 
             losses = sum(loss for loss in loss_dict.values())
 
@@ -176,6 +176,7 @@ def train_model(model, train_dataset, validation_dataset, num_epochs=4, MODEL_TY
         model.load_state_dict(checkpoint['model_state_dict'])
         optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
         epoch = checkpoint['epoch'] + 1
+        print(f'Loaded model epoch {epoch}')
 
     while epoch < num_epochs:
 
