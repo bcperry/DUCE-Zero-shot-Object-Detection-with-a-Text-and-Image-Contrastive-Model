@@ -1,14 +1,13 @@
 import torch
 
 from model import create_model
-from dataset import get_transforms
 import config
 import os
 import matplotlib.pyplot as plt
 from PIL import Image
 import skimage
 import clip
-from utils import evaluate, evaluate_custom
+from utils import evaluate, evaluate_custom, get_transforms
 
 def eval(item_list, image_dir = None, rpn_score_thresh = 0.05, iou_thresh = .2, conf_thresh = .9, MODEL_TYPE = 'CLIP-FRCNN', WEIGHTS_NAME = "weights", MODEL_EPOCH = 311, NMS = False, weighted_bboxes = True):
 
@@ -70,10 +69,11 @@ def eval(item_list, image_dir = None, rpn_score_thresh = 0.05, iou_thresh = .2, 
             images.append(test_transforms(image, [0,0,0,0])[0].to(config.DEVICE))
 
         for number, image in enumerate(images):
+            preds = model(image.unsqueeze(0))
             if NMS:
-                image_out = evaluate(image.unsqueeze(0), item_list, model, iou_thresh, conf_thresh)
+                image_out = evaluate(image.unsqueeze(0), item_list, preds, iou_thresh, conf_thresh)
             else:
-                image_out = evaluate_custom(image.unsqueeze(0), item_list, model, iou_thresh, conf_thresh, weighted=weighted_bboxes)
+                image_out = evaluate_custom(image.unsqueeze(0), item_list, preds, iou_thresh, conf_thresh, weighted=weighted_bboxes)
             plt.imsave(f'./test_images/eval/output_image{number}.jpg',image_out)
 
 
