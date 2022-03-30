@@ -214,12 +214,12 @@ def train_model(model, train_dataset, validation_dataset, num_epochs=4, MODEL_TY
         writer.add_scalar('Loss/RPN Box Regressor Evaluation Loss', eval_metrics.meters['loss_rpn_box_reg'].avg,
                           global_step=(epoch))
         if eval_metrics.meters['loss'].avg <= best_loss:
+            total_evaluation_loss = eval_metrics.meters['loss'].avg
             torch.save({'epoch': epoch,
                         'model_state_dict': model.state_dict(),
-                        'optimizer_state_dict': optimizer.state_dict(),
-                        'epoch': epoch},
+                        'optimizer_state_dict': optimizer.state_dict()},
                        f'{MODEL_TYPE}_{WEIGHTS_NAME}.pth')
-            print(f'Saving epoch {epoch}')
+            print(f'Saving epoch {epoch} - Evaluation Loss {total_evaluation_loss}')
             best_loss = eval_metrics.meters['loss'].avg
 
         epoch += 1

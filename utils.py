@@ -448,9 +448,17 @@ def non_max_suppression(bboxes, iou_threshold, threshold, box_format="corners"):
     """
 
     assert type(bboxes) == list
+    if len(bboxes)== 7:
+        class_prob_idx = 1
+        box_prob_idx = 2
+        box_start_idx = 3
+    else:
+        class_prob_idx = 1
+        box_prob_idx = 1
+        box_start_idx = 2
 
-    bboxes = [box for box in bboxes if box[1] > threshold]
-    bboxes = sorted(bboxes, key=lambda x: x[1], reverse=True)
+    bboxes = [box for box in bboxes if box[box_prob_idx] > threshold]
+    bboxes = sorted(bboxes, key=lambda x: x[box_prob_idx], reverse=True)
     bboxes_after_nms = []
 
     while bboxes:
@@ -461,8 +469,8 @@ def non_max_suppression(bboxes, iou_threshold, threshold, box_format="corners"):
             for box in bboxes
             if box[0] != chosen_box[0]
                or intersection_over_union(
-                torch.tensor(chosen_box[2:]),
-                torch.tensor(box[2:]),
+                torch.tensor(chosen_box[box_start_idx:]),
+                torch.tensor(box[box_start_idx:]),
                 box_format=box_format,
             )
                < iou_threshold
@@ -544,3 +552,70 @@ def evaluate(image, labels, model, iou_thresh, conf_thresh, show = True):
 
     im = plot_image(image.detach().cpu()[0].permute(1,2,0), nms_boxes, labels, show)
     return im
+
+def evaluate_custom(image, labels, model, iou_thresh, conf_thresh, show = True, weighted=True):
+
+    import pandas as pd
+    #run the image through the model
+    outputs = model(image)
+
+    #organize the output for NMS and plotting
+    bboxes = outputs[0]['boxes'].detach().cpu().numpy()
+    bboxes = np.insert(bboxes, 0, outputs[0]['labels'].detach().cpu().numpy(), axis=1)
+    bboxes = np.insert(bboxes, 1, outputs[0]['scores'].detach().cpu().numpy(), axis=1)
+    bboxes = pd.DataFrame(bboxes, columns=('class_pred', 'prob_score', 'x1', 'y1', 'x2', 'y2'))
+
+    #drop low confidence boxes
+    bboxes.drop(bboxes[bboxes.prob_score < conf_thresh].index, inplace=True)
+    bboxes['x_mid'] = (bboxes.x2 - bboxes.x1)/2 + bboxes.x1
+    bboxes['y_mid'] = (bboxes.y2 - bboxes.y1)/2 + bboxes.y1
+
+
+    bboxes = average_bboxes(bboxes, weighted=weighted)
+
+    bboxes = non_max_suppression(bboxes, iou_thresh, conf_thresh)
+
+    #remove the box probability and show only class probability
+    final_box_list = []
+    for box in bboxes:
+        box.pop(2)
+        final_box_list.append(box)
+
+    im = plot_image(image.detach().cpu()[0].permute(1,2,0), final_box_list, labels, show)
+    return im
+
+def average_bboxes(bboxes, weighted = False):
+
+    from sklearn.cluster import DBSCAN
+    unique_preds = bboxes.class_pred.unique()
+    combined_preds = []
+    for pred in unique_preds:
+
+        class_bboxes = bboxes[bboxes.class_pred == pred].copy()
+        db = DBSCAN(eps=50).fit(class_bboxes[['x_mid', 'y_mid']])
+        class_bboxes['cluster'] = db.labels_
+
+        for group in class_bboxes.cluster.unique():
+            clustered_bboxes = class_bboxes[class_bboxes.cluster == group]
+            label = pred
+            class_confidence = clustered_bboxes.prob_score.max()
+            box_confidence = clustered_bboxes.prob_score.mean()
+            if weighted:
+
+                x1 = sum(clustered_bboxes.x1 * clustered_bboxes.prob_score) / clustered_bboxes.prob_score.sum()
+                x2 = sum(clustered_bboxes.x2 * clustered_bboxes.prob_score) / clustered_bboxes.prob_score.sum()
+                y1 = sum(clustered_bboxes.y1 * clustered_bboxes.prob_score) / clustered_bboxes.prob_score.sum()
+                y2 = sum(clustered_bboxes.y2 * clustered_bboxes.prob_score) / clustered_bboxes.prob_score.sum()
+
+                combined_preds.append([label, class_confidence, box_confidence, x1, y1, x2, y2])
+
+            else:
+                x1 = clustered_bboxes.x1.mean()
+                x2 = clustered_bboxes.x2.mean()
+                y1 = clustered_bboxes.y1.mean()
+                y2 = clustered_bboxes.y2.mean()
+
+                combined_preds.append([label, class_confidence, box_confidence, x1, y1, x2, y2])
+
+    return combined_preds
+

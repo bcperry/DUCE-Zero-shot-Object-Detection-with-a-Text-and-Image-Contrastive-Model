@@ -197,14 +197,14 @@ def create_model(model_type='Vanilla', classes=[]):
 
         rpn_pre_nms_top_n_train = 500
         rpn_pre_nms_top_n_test = 500
-        rpn_post_nms_top_n_train = 200
-        rpn_post_nms_top_n_test = 200
+        rpn_post_nms_top_n_train = 250
+        rpn_post_nms_top_n_test = 250
         rpn_nms_thresh = 0.7
-        rpn_fg_iou_thresh = 0.9
-        rpn_bg_iou_thresh = 0.1
+        rpn_fg_iou_thresh = 0.95
+        rpn_bg_iou_thresh = 0.05
         rpn_batch_size_per_image = 256
         rpn_positive_fraction = 0.5
-        rpn_score_thresh = 0.7
+        rpn_score_thresh = 0.0
 
         rpn_pre_nms_top_n = dict(training=rpn_pre_nms_top_n_train, testing=rpn_pre_nms_top_n_test)
         rpn_post_nms_top_n = dict(training=rpn_post_nms_top_n_train, testing=rpn_post_nms_top_n_test)
