@@ -37,7 +37,7 @@ def train_one_epoch(model, optimizer, data_loader, device, epoch, print_freq, sc
         with torch.cuda.amp.autocast(enabled=scaler is not None):
             loss_dict = model(images, targets)
 
-            del loss_dict['loss_classifier'] #for the CLIP model, we do not use classification loss
+            #del loss_dict['loss_classifier'] #for the CLIP model, we do not use classification loss
 
             losses = sum(loss for loss in loss_dict.values())
 
@@ -176,7 +176,8 @@ def train_model(model, train_dataset, validation_dataset, num_epochs=4, MODEL_TY
         model.load_state_dict(checkpoint['model_state_dict'])
         optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
         epoch = checkpoint['epoch'] + 1
-
+        print(f'Loaded model epoch {epoch}')
+    best_loss = 9999
     while epoch < num_epochs:
 
         # train for one epoch, printing every 10 iterations
@@ -212,12 +213,14 @@ def train_model(model, train_dataset, validation_dataset, num_epochs=4, MODEL_TY
         writer.add_scalar('Loss/Objectness Evaluation Loss', eval_metrics.meters['loss_objectness'].avg, global_step=(epoch))
         writer.add_scalar('Loss/RPN Box Regressor Evaluation Loss', eval_metrics.meters['loss_rpn_box_reg'].avg,
                           global_step=(epoch))
-
-        torch.save({'epoch': epoch,
-                    'model_state_dict': model.state_dict(),
-                    'optimizer_state_dict': optimizer.state_dict(),
-                    'epoch': epoch},
-                   f'{MODEL_TYPE}_{WEIGHTS_NAME}.pth')
+        if eval_metrics.meters['loss'].avg <= best_loss:
+            total_evaluation_loss = eval_metrics.meters['loss'].avg
+            torch.save({'epoch': epoch,
+                        'model_state_dict': model.state_dict(),
+                        'optimizer_state_dict': optimizer.state_dict()},
+                       f'{MODEL_TYPE}_{WEIGHTS_NAME}.pth')
+            print(f'Saving epoch {epoch} - Evaluation Loss {total_evaluation_loss}')
+            best_loss = eval_metrics.meters['loss'].avg
 
         epoch += 1
 
