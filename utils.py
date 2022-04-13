@@ -371,7 +371,7 @@ def convert_torch_predictions(preds, det_id, s_id, w, h, classes):
     return detections, det_id
 
 
-def add_detections(model, torch_dataset, view, field_name="predictions"):
+def add_detections(model, torch_dataset, view, field_name="predictions", PRED_CLUSTERING=True):
     import fiftyone as fo
 
     # Run inference on a dataset and add results to FiftyOne
@@ -395,37 +395,49 @@ def add_detections(model, torch_dataset, view, field_name="predictions"):
             w = sample.metadata["width"]
             h = sample.metadata["height"]
 
-            # Inference
-            preds = model(img.unsqueeze(0).to(device))
+            if PRED_CLUSTERING:
+                preds = model(img.unsqueeze(0).to(device))
+                # Combine bboxes with clustering
+                preds = evaluate_custom(image = img.unsqueeze(0),
+                                        labels = classes,
+                                        preds = preds,
+                                        iou_thresh = 1,
+                                        conf_thresh = 0,
+                                        show = False,
+                                        weighted=True)
+                boxes = []
+                labels = []
+                scores = []
 
-            # Combine bboxes with clustering
-            preds = evaluate_custom(image = img.unsqueeze(0),
-                                    labels = classes,
-                                    preds = preds,
-                                    iou_thresh = 1,
-                                    conf_thresh = 0,
-                                    show = False,
-                                    weighted=True)
-            boxes = []
-            labels = []
-            scores = []
+                boxes.append(torch.tensor([box[2:] for box in preds]))
+                labels.append(torch.tensor([box[0] for box in preds]))
+                scores.append(torch.tensor([box[1] for box in preds]))
 
-            boxes.append(torch.tensor([box[2:] for box in preds]))
-            labels.append(torch.tensor([box[0] for box in preds]))
-            scores.append(torch.tensor([box[1] for box in preds]))
+                final_preds = {'boxes': boxes[0],
+                               'labels': labels[0],
+                               'scores': scores[0]}
 
-            final_preds = {'boxes': boxes[0],
-                           'labels': labels[0],
-                           'scores': scores[0]}
+                detections, det_id = convert_torch_predictions(
+                    final_preds,
+                    det_id,
+                    s_id,
+                    w,
+                    h,
+                    classes,
+                )
+            else:
+                preds = model(img.unsqueeze(0).to(device))[0]
 
-            detections, det_id = convert_torch_predictions(
-                final_preds,
-                det_id,
-                s_id,
-                w,
-                h,
-                classes,
-            )
+                detections, det_id = convert_torch_predictions(
+                    preds,
+                    det_id,
+                    s_id,
+                    w,
+                    h,
+                    classes,
+                )
+
+
 
             sample[field_name] = detections
             sample.save()
@@ -597,7 +609,7 @@ def evaluate(image, labels, preds, iou_thresh, conf_thresh, show = True):
     im = plot_image(image.detach().cpu()[0].permute(1,2,0), nms_boxes, labels, show)
     return im
 
-def evaluate_custom(image = None, labels = None, preds = None, iou_thresh = 0.2, conf_thresh = 0.8, show = True, weighted=True):
+def evaluate_custom(image = None, labels = None, preds = None, iou_thresh = 0.2, conf_thresh = 0.8, show = True, weighted=True, eps=50):
 
     import pandas as pd
 
@@ -613,7 +625,7 @@ def evaluate_custom(image = None, labels = None, preds = None, iou_thresh = 0.2,
     bboxes['y_mid'] = (bboxes.y2 - bboxes.y1)/2 + bboxes.y1
 
 
-    bboxes = average_bboxes(bboxes, weighted=weighted)
+    bboxes = average_bboxes(bboxes, weighted=weighted, eps=eps)
 
     bboxes = non_max_suppression(bboxes, iou_thresh, conf_thresh)
 
@@ -628,7 +640,7 @@ def evaluate_custom(image = None, labels = None, preds = None, iou_thresh = 0.2,
     else:
         return final_box_list
 
-def average_bboxes(bboxes, weighted = False):
+def average_bboxes(bboxes, weighted = False, eps=50):
 
     from sklearn.cluster import DBSCAN
     unique_preds = bboxes.class_pred.unique()
@@ -636,7 +648,7 @@ def average_bboxes(bboxes, weighted = False):
     for pred in unique_preds:
 
         class_bboxes = bboxes[bboxes.class_pred == pred].copy()
-        db = DBSCAN(eps=50).fit(class_bboxes[['x_mid', 'y_mid']])
+        db = DBSCAN(eps=eps).fit(class_bboxes[['x_mid', 'y_mid']])
         class_bboxes['cluster'] = db.labels_
 
 
