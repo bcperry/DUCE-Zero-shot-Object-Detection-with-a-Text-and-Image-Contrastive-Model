@@ -8,6 +8,7 @@ from torch import nn, Tensor
 import warnings
 from typing import Tuple, List, Dict, Optional, Union
 import torch.nn.functional as F
+from utils import average_bboxes
 
 class ZeroShotOD(nn.Module):
     """
@@ -111,6 +112,10 @@ class ZeroShotOD(nn.Module):
                 pred_class_list = class_pred.split(boxes_per_image, 0)
                 pred_scores_list = class_score.split(boxes_per_image, 0)
 
+                # used to do bbox clustering
+                # bboxes = zip(pred_class_list, pred_scores_list, boxes_per_image)
+                #
+                # bboxes = average_bboxes(bboxes, weighted=True, eps=30)
 
                 i=0
                 while i < len(images.image_sizes):

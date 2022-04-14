@@ -382,7 +382,7 @@ def convert_torch_predictions(preds, det_id, s_id, w, h, classes, labelmap = Non
     return detections, det_id
 
 
-def add_detections(model, torch_dataset, view, field_name="predictions", labelmap=None, PRED_CLUSTERING=False):
+def add_detections(model, torch_dataset, view, field_name="predictions", labelmap=None, PRED_CLUSTERING=False, eps = 30):
     import fiftyone as fo
 
     # Run inference on a dataset and add results to FiftyOne
@@ -415,7 +415,8 @@ def add_detections(model, torch_dataset, view, field_name="predictions", labelma
                                         iou_thresh = 1,
                                         conf_thresh = 0,
                                         show = False,
-                                        weighted=True)
+                                        weighted=True,
+                                        eps = eps)
                 boxes = []
                 labels = []
                 scores = []
@@ -652,7 +653,7 @@ def evaluate_custom(image = None, labels = None, preds = None, iou_thresh = 0.2,
     else:
         return final_box_list
 
-def average_bboxes(bboxes, weighted = False, eps=50):
+def average_bboxes(bboxes, weighted = True, eps=30):
 
     from sklearn.cluster import DBSCAN
     unique_preds = bboxes.class_pred.unique()

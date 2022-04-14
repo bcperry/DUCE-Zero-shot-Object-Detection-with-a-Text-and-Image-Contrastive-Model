@@ -98,7 +98,7 @@ def create_model(model_type='Vanilla', classes=[]):
         # ratios. We have a Tuple[Tuple[int]] because each feature
         # map could potentially have different sizes and
         # aspect ratios
-        anchor_generator = AnchorGenerator(sizes=((32, 64, 128, 256, 512),),
+        anchor_generator = AnchorGenerator(sizes=((128, 256, 512),),
                                            aspect_ratios=((0.5, 1.0, 2.0),))
 
         # let's define what are the feature maps that we will
@@ -128,9 +128,10 @@ def create_model(model_type='Vanilla', classes=[]):
 
         if model_type == 'CLIP-FRCNN':
             with autocast():
-
+                # tokenize per CLIP paper instructions
+                text_tokens = clip.tokenize(["This is a picture of a " + desc for desc in classes]).cuda()
                 model.roi_heads.box_head = CLIPHead()
-                model.roi_heads.box_predictor = CLIPRCNNPredictor((2048*7*7), classes)  # CLIP space is 2048*7*7 for the RN50 implementation
+                model.roi_heads.box_predictor = CLIPRCNNPredictor((2048*7*7), text_tokens)  # CLIP space is 2048*7*7 for the RN50 implementation
 
 
             #we do not want to train the predictor since it is embedding into CLIP space
@@ -176,8 +177,8 @@ def create_model(model_type='Vanilla', classes=[]):
         # ratios. We have a Tuple[Tuple[int]] because each feature
         # map could potentially have different sizes and
         # aspect ratios
-        rpn_anchor_generator = AnchorGenerator(sizes=((32, 64, 128, 256, 512),),
-                                               aspect_ratios=((0.5, 1.0, 2.0),))
+        rpn_anchor_generator = AnchorGenerator(sizes=((128, 256, 512),),
+                                           aspect_ratios=((0.5, 1.0, 2.0),))
 
         # let's define what are the feature maps that we will
         # use to perform the region of interest cropping, as well as
@@ -223,7 +224,9 @@ def create_model(model_type='Vanilla', classes=[]):
 
         transform = GeneralizedRCNNTransform(min_size, max_size, image_mean[0], image_std[0])
 
-        classifier = CLIPRPNPredictor((2048 * 7 * 7), classes)
+        text_tokens = clip.tokenize(["This is a picture of a " + desc for desc in classes]).cuda()
+
+        classifier = CLIPRPNPredictor((2048 * 7 * 7), text_tokens)
 
         model = ZeroShotOD(backbone, rpn, roi_pooler, classifier, transform)
 
