@@ -8,6 +8,7 @@ from PIL import Image
 import skimage
 import clip
 from utils import evaluate, evaluate_custom, get_transforms
+import torchvision.transforms as transforms
 
 def eval(item_list,
          image_dir = None,
@@ -76,7 +77,8 @@ def eval(item_list,
 
             image = Image.open(os.path.join(image_dir, filename)).convert("RGB")
 
-            images.append(test_transforms(image, [0,0,0,0])[0].to(config.DEVICE))
+            transform = transforms.ToTensor()
+            images.append(transform(image).to(config.DEVICE))
 
         for number, image in enumerate(images):
             preds = model(image.unsqueeze(0))
