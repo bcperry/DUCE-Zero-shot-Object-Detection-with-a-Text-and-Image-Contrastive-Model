@@ -348,9 +348,12 @@ def init_distributed_mode(args):
 
 
 
-def convert_torch_predictions(preds, det_id, s_id, w, h, classes):
+def convert_torch_predictions(preds, det_id, s_id, w, h, classes, labelmap = None):
     import fiftyone as fo
     import fiftyone.utils.coco as fouc
+
+    # labelmap is a dictionary mapping from label integer to label name
+
     # Convert the outputs of the torch model into a FiftyOne Detections object
     dets = []
     for bbox, label, score in zip(
@@ -360,6 +363,14 @@ def convert_torch_predictions(preds, det_id, s_id, w, h, classes):
     ):
         # Parse prediction into FiftyOne Detection object
         x0, y0, x1, y1 = bbox
+
+        if labelmap is not None:
+            label_class = labelmap[int(label)] # get the class name
+            if label_class in classes: # check if the label is in the class list
+                label = classes.index(label_class) # convert the label to the appropriate class id
+            else:
+                label = 0 # consider this a background class
+
         coco_obj = fouc.COCOObject(det_id, s_id, int(label), [x0, y0, x1 - x0, y1 - y0])
         det = coco_obj.to_detection((w, h), classes)
         det["confidence"] = float(score)
@@ -371,7 +382,7 @@ def convert_torch_predictions(preds, det_id, s_id, w, h, classes):
     return detections, det_id
 
 
-def add_detections(model, torch_dataset, view, field_name="predictions", PRED_CLUSTERING=True):
+def add_detections(model, torch_dataset, view, field_name="predictions", labelmap=None, PRED_CLUSTERING=False):
     import fiftyone as fo
 
     # Run inference on a dataset and add results to FiftyOne
@@ -435,6 +446,7 @@ def add_detections(model, torch_dataset, view, field_name="predictions", PRED_CL
                     w,
                     h,
                     classes,
+                    labelmap,
                 )
 
 
