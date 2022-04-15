@@ -58,6 +58,11 @@ class FiftyOneTorchDataset(torch.utils.data.Dataset):
                 det, metadata, category_id=category_id,
             )
             x, y, w, h = coco_obj.bbox
+            # some images contain invalid bboxes, with small or no size
+            if w<5:
+                continue
+            if h<5:
+                continue
             boxes.append([x, y, x + w, y + h])
             labels.append(coco_obj.category_id)
             area.append(coco_obj.area)
