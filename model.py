@@ -52,7 +52,7 @@ def create_model(model_type='Vanilla', classes=[]):
         # ratios. We have a Tuple[Tuple[int]] because each feature
         # map could potentially have different sizes and
         # aspect ratios
-        anchor_generator = AnchorGenerator(sizes=((32, 64, 128, 256, 512),),
+        anchor_generator = AnchorGenerator(sizes=((128, 256, 512),),
                                            aspect_ratios=((0.5, 1.0, 2.0),))
 
         # let's define what are the feature maps that we will
