@@ -33,15 +33,12 @@ def eval(item_list,
     with torch.no_grad():
 
         # tokenize item list for CLIP
-        if item_list[0] != '':
+        if item_list[0] != ' ':
              item_list.insert(0,' ')
 
-        text_tokens = clip.tokenize(["This is " + desc for desc in item_list]).cuda()
-
-
-        CHECKPOINT_NAME = f'{MODEL_TYPE}_{WEIGHTS_NAME}.pth'
+        CHECKPOINT_NAME = WEIGHTS_NAME
         checkpoint = torch.load(CHECKPOINT_NAME)
-        model = create_model(MODEL_TYPE, classes=text_tokens)
+        model = create_model(MODEL_TYPE, classes=item_list)
 
         model.load_state_dict(checkpoint['model_state_dict'])
         epoch = checkpoint['epoch']
