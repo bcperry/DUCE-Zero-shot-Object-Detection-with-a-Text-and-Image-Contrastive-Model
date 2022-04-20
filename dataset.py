@@ -66,7 +66,7 @@ class FiftyOneTorchDataset(torch.utils.data.Dataset):
             boxes.append([x, y, x + w, y + h])
             labels.append(coco_obj.category_id)
             area.append(coco_obj.area)
-            iscrowd.append(coco_obj.iscrowd)
+            iscrowd.append(0)
 
         target = {}
         target["boxes"] = torch.as_tensor(boxes, dtype=torch.float32)
