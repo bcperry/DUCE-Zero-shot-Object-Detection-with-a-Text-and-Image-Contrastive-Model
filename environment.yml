@@ -18,7 +18,6 @@ dependencies:
     - albumentations
     - opencv-python
     - tensorboard
-    - "git+https://github.com/philferriere/cocoapi.git#subdirectory=PythonAPI"
     - torchsummary
     - fiftyone
     - "git+https://github.com/openai/CLIP.git"
@@ -26,3 +25,5 @@ dependencies:
     - regex
     - tqdm
     - jupyter
+    - ipykernel
+    - "git+https://github.com/bcperry/cocoapi_windows.git#subdirectory=PythonAPI"

@@ -1,9 +1,7 @@
 import torch
 import fiftyone.utils.coco as fouc
 from PIL import Image
-import transforms as T
-import torchvision.transforms as transforms
-import config
+
 
 class FiftyOneTorchDataset(torch.utils.data.Dataset):
     """A class to construct a PyTorch dataset from a FiftyOne dataset.
@@ -24,6 +22,7 @@ class FiftyOneTorchDataset(torch.utils.data.Dataset):
             gt_field="ground_truth",
             classes=None,
     ):
+
         self.samples = fiftyone_dataset
         self.transforms = transforms
         self.gt_field = gt_field
@@ -59,6 +58,11 @@ class FiftyOneTorchDataset(torch.utils.data.Dataset):
                 det, metadata, category_id=category_id,
             )
             x, y, w, h = coco_obj.bbox
+            # some images contain invalid bboxes, with small or no size
+            if w<5:
+                continue
+            if h<5:
+                continue
             boxes.append([x, y, x + w, y + h])
             labels.append(coco_obj.category_id)
             area.append(coco_obj.area)
@@ -83,24 +87,3 @@ class FiftyOneTorchDataset(torch.utils.data.Dataset):
         return len(self.img_paths)
 
 
-class Compose(object):
-    def __init__(self, transforms):
-        self.transforms = transforms
-
-    def __call__(self, img, bboxes):
-        for t in self.transforms:
-            img, bboxes = t(img), bboxes
-
-        return img, bboxes
-
-def get_transforms(Normalize = False):
-
-    if Normalize:
-        test_transforms = Compose([transforms.ToTensor(),
-                                     transforms.Normalize(mean=config.MEAN, std=config.STD), ])
-        train_transforms = Compose(
-            [transforms.ToTensor(), transforms.RandomHorizontalFlip(0.5), transforms.Normalize(mean=config.MEAN, std=config.STD), ])
-    else:
-        train_transforms = Compose([transforms.ToTensor(), transforms.RandomHorizontalFlip(0.5)])
-        test_transforms = Compose([transforms.ToTensor()])
-    return train_transforms, test_transforms

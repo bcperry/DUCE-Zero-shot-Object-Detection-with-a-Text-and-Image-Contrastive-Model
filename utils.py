@@ -9,8 +9,37 @@ import torch
 import torch.distributed as dist
 from torch import nn
 
-from typing import Dict, Iterable, Callable
+from typing import Iterable, Callable
 from torch import Tensor
+
+import matplotlib.pyplot as plt
+import numpy as np
+from matplotlib.patches import Rectangle
+
+import torchvision.transforms as transforms
+import config
+
+class Compose(object):
+    def __init__(self, transforms):
+        self.transforms = transforms
+
+    def __call__(self, img, bboxes):
+        for t in self.transforms:
+            img, bboxes = t(img), bboxes
+
+        return img, bboxes
+
+def get_transforms(Normalize = False):
+
+    if Normalize:
+        test_transforms = Compose([transforms.ToTensor(),
+                                     transforms.Normalize(mean=config.MEAN, std=config.STD), ])
+        train_transforms = Compose(
+            [transforms.ToTensor(), transforms.RandomHorizontalFlip(0.5), transforms.Normalize(mean=config.MEAN, std=config.STD), ])
+    else:
+        train_transforms = Compose([transforms.ToTensor(), transforms.RandomHorizontalFlip(0.5)])
+        test_transforms = Compose([transforms.ToTensor()])
+    return train_transforms, test_transforms
 
 def collate_fn(batch):
     valid = []
@@ -319,9 +348,12 @@ def init_distributed_mode(args):
 
 
 
-def convert_torch_predictions(preds, det_id, s_id, w, h, classes):
+def convert_torch_predictions(preds, det_id, s_id, w, h, classes, labelmap = None):
     import fiftyone as fo
     import fiftyone.utils.coco as fouc
+
+    # labelmap is a dictionary mapping from label integer to label name
+
     # Convert the outputs of the torch model into a FiftyOne Detections object
     dets = []
     for bbox, label, score in zip(
@@ -331,6 +363,14 @@ def convert_torch_predictions(preds, det_id, s_id, w, h, classes):
     ):
         # Parse prediction into FiftyOne Detection object
         x0, y0, x1, y1 = bbox
+
+        if labelmap is not None:
+            label_class = labelmap[int(label)] # get the class name
+            if label_class in classes: # check if the label is in the class list
+                label = classes.index(label_class) # convert the label to the appropriate class id
+            else:
+                label = 0 # consider this a background class
+
         coco_obj = fouc.COCOObject(det_id, s_id, int(label), [x0, y0, x1 - x0, y1 - y0])
         det = coco_obj.to_detection((w, h), classes)
         det["confidence"] = float(score)
@@ -342,9 +382,9 @@ def convert_torch_predictions(preds, det_id, s_id, w, h, classes):
     return detections, det_id
 
 
-def add_detections(model, torch_dataset, view, field_name="predictions"):
+def add_detections(model, torch_dataset, view, field_name="predictions", labelmap=None, PRED_CLUSTERING=False, eps = 30):
     import fiftyone as fo
-    import fiftyone.utils.coco as fouc
+
     # Run inference on a dataset and add results to FiftyOne
     torch.set_num_threads(1)
     device = torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu')
@@ -366,17 +406,51 @@ def add_detections(model, torch_dataset, view, field_name="predictions"):
             w = sample.metadata["width"]
             h = sample.metadata["height"]
 
-            # Inference
-            preds = model(img.unsqueeze(0).to(device))[0]
+            if PRED_CLUSTERING:
+                preds = model(img.unsqueeze(0).to(device))
+                # Combine bboxes with clustering
+                preds = evaluate_custom(image = img.unsqueeze(0),
+                                        labels = classes,
+                                        preds = preds,
+                                        iou_thresh = 1,
+                                        conf_thresh = 0,
+                                        show = False,
+                                        weighted=True,
+                                        eps = eps)
+                boxes = []
+                labels = []
+                scores = []
 
-            detections, det_id = convert_torch_predictions(
-                preds,
-                det_id,
-                s_id,
-                w,
-                h,
-                classes,
-            )
+                boxes.append(torch.tensor([box[2:] for box in preds]))
+                labels.append(torch.tensor([box[0] for box in preds]))
+                scores.append(torch.tensor([box[1] for box in preds]))
+
+                final_preds = {'boxes': boxes[0],
+                               'labels': labels[0],
+                               'scores': scores[0]}
+
+                detections, det_id = convert_torch_predictions(
+                    final_preds,
+                    det_id,
+                    s_id,
+                    w,
+                    h,
+                    classes,
+                )
+            else:
+                preds = model(img.unsqueeze(0).to(device))[0]
+
+                detections, det_id = convert_torch_predictions(
+                    preds,
+                    det_id,
+                    s_id,
+                    w,
+                    h,
+                    classes,
+                    labelmap,
+                )
+
+
 
             sample[field_name] = detections
             sample.save()
@@ -448,9 +522,17 @@ def non_max_suppression(bboxes, iou_threshold, threshold, box_format="corners"):
     """
 
     assert type(bboxes) == list
+    if len(bboxes)== 7:
+        class_prob_idx = 1
+        box_prob_idx = 2
+        box_start_idx = 3
+    else:
+        class_prob_idx = 1
+        box_prob_idx = 1
+        box_start_idx = 2
 
-    bboxes = [box for box in bboxes if box[1] > threshold]
-    bboxes = sorted(bboxes, key=lambda x: x[1], reverse=True)
+    bboxes = [box for box in bboxes if box[box_prob_idx] > threshold]
+    bboxes = sorted(bboxes, key=lambda x: x[box_prob_idx], reverse=True)
     bboxes_after_nms = []
 
     while bboxes:
@@ -461,8 +543,8 @@ def non_max_suppression(bboxes, iou_threshold, threshold, box_format="corners"):
             for box in bboxes
             if box[0] != chosen_box[0]
                or intersection_over_union(
-                torch.tensor(chosen_box[2:]),
-                torch.tensor(box[2:]),
+                torch.tensor(chosen_box[box_start_idx:]),
+                torch.tensor(box[box_start_idx:]),
                 box_format=box_format,
             )
                < iou_threshold
@@ -472,9 +554,7 @@ def non_max_suppression(bboxes, iou_threshold, threshold, box_format="corners"):
 
     return bboxes_after_nms
 
-import matplotlib.pyplot as plt
-import numpy as np
-from matplotlib.patches import Rectangle
+
 
 def plot_image(image, boxes, class_labels, show = True):
     cmap = plt.get_cmap("tab20b")
@@ -528,19 +608,84 @@ def plot_image(image, boxes, class_labels, show = True):
         plt.close()
     return im
 
-def evaluate(image, labels, model, iou_thresh, conf_thresh, show = True):
+def evaluate(image, labels, preds, iou_thresh, conf_thresh, show = True):
 
-
-    #run the image through the model
-    outputs = model(image)
 
     #organize the output for NMS and plotting
-    bboxes = outputs[0]['boxes'].detach().cpu().numpy()
-    bboxes = np.insert(bboxes, 0, outputs[0]['labels'].detach().cpu().numpy(), axis=1)
-    bboxes = np.insert(bboxes, 1, outputs[0]['scores'].detach().cpu().numpy(), axis=1)
+    bboxes = preds[0]['boxes'].detach().cpu().numpy()
+    bboxes = np.insert(bboxes, 0, preds[0]['labels'].detach().cpu().numpy(), axis=1)
+    bboxes = np.insert(bboxes, 1, preds[0]['scores'].detach().cpu().numpy(), axis=1)
     bboxes = list(bboxes)
 
     nms_boxes = non_max_suppression(bboxes, iou_thresh, conf_thresh)
 
     im = plot_image(image.detach().cpu()[0].permute(1,2,0), nms_boxes, labels, show)
     return im
+
+def evaluate_custom(image = None, labels = None, preds = None, iou_thresh = 0.2, conf_thresh = 0.8, show = True, weighted=True, eps=50):
+
+    import pandas as pd
+
+    #organize the output for NMS and plotting
+    bboxes = preds[0]['boxes'].detach().cpu().numpy()
+    bboxes = np.insert(bboxes, 0, preds[0]['labels'].detach().cpu().numpy(), axis=1)
+    bboxes = np.insert(bboxes, 1, preds[0]['scores'].detach().cpu().numpy(), axis=1)
+    bboxes = pd.DataFrame(bboxes, columns=('class_pred', 'prob_score', 'x1', 'y1', 'x2', 'y2'))
+
+    #drop low confidence boxes
+    bboxes.drop(bboxes[bboxes.prob_score < conf_thresh].index, inplace=True)
+    bboxes['x_mid'] = (bboxes.x2 - bboxes.x1)/2 + bboxes.x1
+    bboxes['y_mid'] = (bboxes.y2 - bboxes.y1)/2 + bboxes.y1
+
+
+    bboxes = average_bboxes(bboxes, weighted=weighted, eps=eps)
+
+    bboxes = non_max_suppression(bboxes, iou_thresh, conf_thresh)
+
+    #remove the box probability and show only class probability
+    final_box_list = []
+    for box in bboxes:
+        box.pop(2)
+        final_box_list.append(box)
+    if show:
+        im = plot_image(image.detach().cpu()[0].permute(1,2,0), final_box_list, labels, show)
+        return im
+    else:
+        return final_box_list
+
+def average_bboxes(bboxes, weighted = True, eps=30):
+
+    from sklearn.cluster import DBSCAN
+    unique_preds = bboxes.class_pred.unique()
+    combined_preds = []
+    for pred in unique_preds:
+
+        class_bboxes = bboxes[bboxes.class_pred == pred].copy()
+        db = DBSCAN(eps=eps).fit(class_bboxes[['x_mid', 'y_mid']])
+        class_bboxes['cluster'] = db.labels_
+
+
+        for group in class_bboxes.cluster.unique():
+            clustered_bboxes = class_bboxes[class_bboxes.cluster == group]
+            label = pred
+            class_confidence = clustered_bboxes.prob_score.max()
+            box_confidence = clustered_bboxes.prob_score.mean()
+            if weighted:
+
+                x1 = sum(clustered_bboxes.x1 * clustered_bboxes.prob_score) / clustered_bboxes.prob_score.sum()
+                x2 = sum(clustered_bboxes.x2 * clustered_bboxes.prob_score) / clustered_bboxes.prob_score.sum()
+                y1 = sum(clustered_bboxes.y1 * clustered_bboxes.prob_score) / clustered_bboxes.prob_score.sum()
+                y2 = sum(clustered_bboxes.y2 * clustered_bboxes.prob_score) / clustered_bboxes.prob_score.sum()
+
+                combined_preds.append([label, class_confidence, box_confidence, x1, y1, x2, y2])
+
+            else:
+                x1 = clustered_bboxes.x1.mean()
+                x2 = clustered_bboxes.x2.mean()
+                y1 = clustered_bboxes.y1.mean()
+                y2 = clustered_bboxes.y2.mean()
+
+                combined_preds.append([label, class_confidence, box_confidence, x1, y1, x2, y2])
+
+    return combined_preds
+

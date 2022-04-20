@@ -36,6 +36,9 @@ def train_one_epoch(model, optimizer, data_loader, device, epoch, print_freq, sc
         targets = [{k: v.to(device) for k, v in t.items()} for t in targets]
         with torch.cuda.amp.autocast(enabled=scaler is not None):
             loss_dict = model(images, targets)
+
+            #del loss_dict['loss_classifier'] #for the CLIP model, we do not use classification loss
+
             losses = sum(loss for loss in loss_dict.values())
 
 
@@ -125,7 +128,7 @@ def evaluate(model, data_loader, device):
 from torch.utils.tensorboard import SummaryWriter
 from model import test_backbone
 
-def train_model(model, train_dataset, validation_dataset, num_epochs=4, MODEL_TYPE='Custom-Vanilla', batch_size = config.BATCH_SIZE): #'CLIP-FRCNN'  #  Vanilla, Custom-Vanilla, or CLIP-FRCNN):
+def train_model(model, train_dataset, validation_dataset, num_epochs=4, MODEL_TYPE='Custom-Vanilla', batch_size = config.BATCH_SIZE, WEIGHTS_NAME = "weights", CONTINUE_TRAINING = False): #'CLIP-FRCNN'  #  Vanilla, Custom-Vanilla, or CLIP-FRCNN):
     # define training and validation data loaders
     train_data_loader = torch.utils.data.DataLoader(
         train_dataset,
@@ -165,27 +168,38 @@ def train_model(model, train_dataset, validation_dataset, num_epochs=4, MODEL_TY
 
     scaler = torch.cuda.amp.GradScaler()
 
-    for epoch in range(num_epochs):
+    epoch=0
+
+    if CONTINUE_TRAINING:
+        CHECKPOINT_NAME = f'{MODEL_TYPE}_{WEIGHTS_NAME}.pth'
+        checkpoint = torch.load(CHECKPOINT_NAME)
+        model.load_state_dict(checkpoint['model_state_dict'])
+        optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
+        epoch = checkpoint['epoch'] + 1
+        print(f'Loaded model epoch {epoch}')
+    best_loss = 9999
+    while epoch < num_epochs:
+
         # train for one epoch, printing every 10 iterations
         training_metrics = train_one_epoch(model, optimizer, train_data_loader, config.DEVICE, epoch, print_freq=10, training=True, scaler=scaler)
 
         # if MODEL_TYPE == 'CLIP-FRCNN':  # check that we dont change the weights from the backbone
         #     weight_tester.test(model)
 
-        # evaluate on the test dataset
-        evaluate(model, valid_data_loader, device=config.DEVICE)
+        if epoch % 5 == 0:  #evaluate the mAP of the model every 3 epochs
+            # evaluate on the test dataset
+            evaluate(model, valid_data_loader, device=config.DEVICE)
 
         # train for one epoch, printing every 10 iterations
         eval_metrics = train_one_epoch(model, optimizer, valid_data_loader, config.DEVICE, epoch, print_freq=100,
                                   training=False, scaler=scaler)
-        # update the learning rate
-        #lr_scheduler.step(eval_metrics.meters['loss'].avg)
+
 
         #training metrics
         # write to tensorboard
         writer.add_scalar('Learning Rate', training_metrics.meters['lr'].avg, global_step=(epoch))
         writer.add_scalar('Loss/Total Loss', training_metrics.meters['loss'].avg, global_step=(epoch))
-        writer.add_scalar('Loss/Classifier Loss', training_metrics.meters['loss_classifier'].avg, global_step=(epoch))
+        # writer.add_scalar('Loss/Classifier Loss', training_metrics.meters['loss_classifier'].avg, global_step=(epoch))
         writer.add_scalar('Loss/Box Regressor Loss', training_metrics.meters['loss_box_reg'].avg, global_step=(epoch))
         writer.add_scalar('Loss/Objectness Loss', training_metrics.meters['loss_objectness'].avg, global_step=(epoch))
         writer.add_scalar('Loss/RPN Box Regressor Loss', training_metrics.meters['loss_rpn_box_reg'].avg,
@@ -194,11 +208,19 @@ def train_model(model, train_dataset, validation_dataset, num_epochs=4, MODEL_TY
         #evaluation metrics
         # write to tensorboard
         writer.add_scalar('Loss/Total Evaluation Loss', eval_metrics.meters['loss'].avg, global_step=(epoch))
-        writer.add_scalar('Loss/Classifier Evaluation Loss', eval_metrics.meters['loss_classifier'].avg, global_step=(epoch))
+        # writer.add_scalar('Loss/Classifier Evaluation Loss', eval_metrics.meters['loss_classifier'].avg, global_step=(epoch))
         writer.add_scalar('Loss/Box Regressor Evaluation Loss', eval_metrics.meters['loss_box_reg'].avg, global_step=(epoch))
         writer.add_scalar('Loss/Objectness Evaluation Loss', eval_metrics.meters['loss_objectness'].avg, global_step=(epoch))
         writer.add_scalar('Loss/RPN Box Regressor Evaluation Loss', eval_metrics.meters['loss_rpn_box_reg'].avg,
                           global_step=(epoch))
+        if eval_metrics.meters['loss'].avg <= best_loss:
+            total_evaluation_loss = eval_metrics.meters['loss'].avg
+            torch.save({'epoch': epoch,
+                        'model_state_dict': model.state_dict(),
+                        'optimizer_state_dict': optimizer.state_dict()},
+                       f'{MODEL_TYPE}_{WEIGHTS_NAME}.pth')
+            print(f'Saving epoch {epoch} - Evaluation Loss {total_evaluation_loss}')
+            best_loss = eval_metrics.meters['loss'].avg
 
-        torch.save(model.state_dict(), f'{MODEL_TYPE}_epoch_{epoch}.pth')
+        epoch += 1
 
