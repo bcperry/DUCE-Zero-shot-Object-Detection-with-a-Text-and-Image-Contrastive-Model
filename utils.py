@@ -352,6 +352,15 @@ def convert_torch_predictions(preds, det_id, s_id, w, h, classes, labelmap = Non
     import fiftyone as fo
     import fiftyone.utils.coco as fouc
 
+    if labelmap[0] != 'background':
+        labelmap.insert(0, 'background')
+
+    # find the largest possible prediction integer (because coco sucks)
+    if type(labelmap) is list:
+        max_id = len(labelmap)
+    else:
+        max_id = max(labelmap, key=int)
+
     # labelmap is a dictionary mapping from label integer to label name
 
     # Convert the outputs of the torch model into a FiftyOne Detections object
@@ -365,11 +374,15 @@ def convert_torch_predictions(preds, det_id, s_id, w, h, classes, labelmap = Non
         x0, y0, x1, y1 = bbox
 
         if labelmap is not None:
-            label_class = labelmap[int(label)] # get the class name
-            if label_class in classes: # check if the label is in the class list
-                label = classes.index(label_class) # convert the label to the appropriate class id
+            if int(label) >= max_id: # if we predict something outside of the labelmap, warn the user and then consider it a background
+                label=0
             else:
-                label = 0 # consider this a background class
+                label_class = labelmap[int(label)] # get the class name
+
+                if label_class in classes: # check if the label is in the class list
+                    label = classes.index(label_class) # convert the label to the appropriate class id
+                else:
+                    label = 0 # consider this a background class
 
         coco_obj = fouc.COCOObject(det_id, s_id, int(label), [x0, y0, x1 - x0, y1 - y0])
         det = coco_obj.to_detection((w, h), classes)
@@ -436,6 +449,7 @@ def add_detections(model, torch_dataset, view, field_name="predictions", labelma
                     w,
                     h,
                     classes,
+                    labelmap,
                 )
             else:
                 preds = model(img.unsqueeze(0).to(device))[0]
