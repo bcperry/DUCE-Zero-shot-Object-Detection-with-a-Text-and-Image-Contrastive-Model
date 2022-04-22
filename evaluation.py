@@ -20,9 +20,8 @@ def eval(item_list,
          MODEL_EPOCH = 311,
          PRED_CLUSTERING = False,
          weighted_bboxes = True,
-         eps=50):
-
-    train_transforms, test_transforms = get_transforms()
+         eps=50,
+         show_predictions = True):
 
     rpn_score_thresh = rpn_score_thresh
     iou_thresh = iou_thresh
@@ -86,13 +85,16 @@ def eval(item_list,
                                             iou_thresh,
                                             conf_thresh,
                                             weighted=weighted_bboxes,
-                                            eps=eps)
+                                            eps=eps,
+                                            show = show_predictions
+                                            )
             else:
                 image_out = evaluate(image.unsqueeze(0),
                                      item_list,
                                      preds,
                                      iou_thresh,
-                                     conf_thresh)
+                                     conf_thresh,
+                                     show = show_predictions)
             plt.imsave(f'./test_images/eval/output_image{number}.jpg',image_out)
 
 

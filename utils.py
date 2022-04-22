@@ -568,6 +568,24 @@ def non_max_suppression(bboxes, iou_threshold, threshold, box_format="corners"):
 
     return bboxes_after_nms
 
+import cv2
+# a helper function from  https://stackoverflow.com/questions/60674501/how-to-make-black-background-in-cv2-puttext-with-python-opencv
+def draw_text(img, text,
+          font=cv2.FONT_HERSHEY_SIMPLEX,
+          pos=(0, 0),
+          font_scale=1,
+          font_thickness=2,
+          text_color=(0, 0, 0),
+          text_color_bg=(0, 0, 0)
+          ):
+
+    x, y = pos
+    text_size, _ = cv2.getTextSize(text, font, font_scale, font_thickness)
+    text_w, text_h = text_size
+    cv2.rectangle(img, pos, (x + text_w, y + text_h), text_color_bg, -1)
+    cv2.putText(img, text, (x, y + text_h + font_scale - 1), font, font_scale, text_color, font_thickness)
+
+    return img
 
 
 def plot_image(image, boxes, class_labels, show = True):
@@ -576,11 +594,7 @@ def plot_image(image, boxes, class_labels, show = True):
     im = np.array(image)
     height, width, _ = im.shape
 
-    # Create figure and axes
-    fig, ax = plt.subplots(1)
-    # Display the image
-
-    ax.imshow(im)
+    im = cv2.cvtColor(im, cv2.COLOR_BGR2RGB)
 
     # Create a Rectangle patch
     for box in boxes:
@@ -588,39 +602,86 @@ def plot_image(image, boxes, class_labels, show = True):
         class_pred = box[0]
         class_conf = np.round(box[1],2)
         box = box[2:]
-        upper_left_x = box[0]
-        upper_left_y = box[1]
-        w = box[2] - box[0]
-        h = box[3] - box[1]
+        upper_left_x = int(box[0])
+        upper_left_y = int(box[1])
+        w = int(box[2] - box[0])
+        h = int(box[3] - box[1])
+        bottom_right_x = upper_left_x + w
+        bottom_right_y = upper_left_y + h
 
-        rect = Rectangle(
-            (upper_left_x, upper_left_y),
-            w,
-            h,
-            linewidth=2,
-            edgecolor=colors[int(class_pred)],
-            facecolor="none",
-        )
-        # Add the patch to the Axes
-        ax.add_patch(rect)
-        plt.text(
-            upper_left_x,
-            upper_left_y,
-            s=class_labels[int(class_pred)] + ": " + str(class_conf),
-            color="white",
-            verticalalignment="top",
-            bbox={"color": colors[int(class_pred)], "pad": 0},
-        )
-    fig.canvas.draw()
-    data = np.frombuffer(fig.canvas.tostring_rgb(), dtype=np.uint8)
-    w, h = fig.canvas.get_width_height()
-    im = data.reshape((int(h), int(w), -1))
+        im = cv2.rectangle(im,
+                           (upper_left_x, upper_left_y),
+                           (bottom_right_x, bottom_right_y),
+                           thickness=2,
+                           color=colors[int(class_pred)],
+                           )
+
+        im = draw_text(im,
+                         text=class_labels[int(class_pred)] + ": " + str(class_conf),
+                         pos=(upper_left_x, upper_left_y),
+                         text_color_bg=colors[int(class_pred)],
+                         )
 
     if show:
-        plt.show()
+        cv2.imshow('img', im)
+        cv2.resizeWindow(winname='img', width=800, height=800)
+        cv2.waitKey()
+        cv2.destroyAllWindows()
     else:
         plt.close()
-    return im
+    return cv2.cvtColor(im, cv2.COLOR_BGR2RGB)
+
+# def plot_image(image, boxes, class_labels, show = True):
+#     cmap = plt.get_cmap("tab20b")
+#     colors = [cmap(i) for i in np.linspace(0, 1, len(class_labels))]
+#     im = np.array(image)
+#     height, width, _ = im.shape
+#
+#     # Create figure and axes
+#     fig, ax = plt.subplots(1)
+#     # Display the image
+#
+#     ax.imshow(im)
+#
+#     # Create a Rectangle patch
+#     for box in boxes:
+#         assert len(box) == 6, "box should contain class pred, confidence, x, y, width, height"
+#         class_pred = box[0]
+#         class_conf = np.round(box[1],2)
+#         box = box[2:]
+#         upper_left_x = box[0]
+#         upper_left_y = box[1]
+#         w = box[2] - box[0]
+#         h = box[3] - box[1]
+#
+#         rect = Rectangle(
+#             (upper_left_x, upper_left_y),
+#             w,
+#             h,
+#             linewidth=2,
+#             edgecolor=colors[int(class_pred)],
+#             facecolor="none",
+#         )
+#         # Add the patch to the Axes
+#         ax.add_patch(rect)
+#         plt.text(
+#             upper_left_x,
+#             upper_left_y,
+#             s=class_labels[int(class_pred)] + ": " + str(class_conf),
+#             color="white",
+#             verticalalignment="top",
+#             bbox={"color": colors[int(class_pred)], "pad": 0},
+#         )
+#     fig.canvas.draw()
+#     data = np.frombuffer(fig.canvas.tostring_rgb(), dtype=np.uint8)
+#     w, h = fig.canvas.get_width_height()
+#     im = data.reshape((int(h), int(w), -1))
+#
+#     if show:
+#         plt.show()
+#     else:
+#         plt.close()
+#     return im
 
 def evaluate(image, labels, preds, iou_thresh, conf_thresh, show = True):
 
