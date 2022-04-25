@@ -695,7 +695,7 @@ def evaluate(image, labels, preds, iou_thresh, conf_thresh, show = True):
     nms_boxes = non_max_suppression(bboxes, iou_thresh, conf_thresh)
 
     im = plot_image(image.detach().cpu()[0].permute(1,2,0), nms_boxes, labels, show)
-    return im
+    return im, nms_boxes
 
 def evaluate_custom(image = None, labels = None, preds = None, iou_thresh = 0.2, conf_thresh = 0.8, show = True, weighted=True, eps=50):
 
@@ -722,11 +722,9 @@ def evaluate_custom(image = None, labels = None, preds = None, iou_thresh = 0.2,
     for box in bboxes:
         box.pop(2)
         final_box_list.append(box)
-    if show:
-        im = plot_image(image.detach().cpu()[0].permute(1,2,0), final_box_list, labels, show)
-        return im
-    else:
-        return final_box_list
+    im = plot_image(image.detach().cpu()[0].permute(1, 2, 0), final_box_list, labels, show)
+
+    return im, final_box_list
 
 def average_bboxes(bboxes, weighted = True, eps=30):
 

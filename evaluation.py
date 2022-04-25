@@ -79,7 +79,7 @@ def eval(item_list,
         for number, image in enumerate(images):
             preds = model(image.unsqueeze(0))
             if PRED_CLUSTERING:
-                image_out = evaluate_custom(image.unsqueeze(0),
+                image_out, box_list = evaluate_custom(image.unsqueeze(0),
                                             item_list,
                                             preds,
                                             iou_thresh,
@@ -89,7 +89,7 @@ def eval(item_list,
                                             show = show_predictions
                                             )
             else:
-                image_out = evaluate(image.unsqueeze(0),
+                image_out, box_list = evaluate(image.unsqueeze(0),
                                      item_list,
                                      preds,
                                      iou_thresh,
