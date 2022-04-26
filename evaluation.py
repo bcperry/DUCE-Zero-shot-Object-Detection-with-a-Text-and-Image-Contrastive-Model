@@ -6,21 +6,19 @@ import os
 import matplotlib.pyplot as plt
 from PIL import Image
 import skimage
-import clip
-from utils import evaluate, evaluate_custom, get_transforms
+from utils import evaluate, evaluate_custom
 import torchvision.transforms as transforms
 
 def eval(item_list,
+         background_classes = None,
          image_dir = None,
          rpn_score_thresh = 0.05,
          iou_thresh = .2,
-         conf_thresh = .9,
-         MODEL_TYPE = 'CLIP-FRCNN',
+         conf_thresh = .5,
+         MODEL_TYPE = 'CLIP-RPN',
          WEIGHTS_NAME = "weights",
-         MODEL_EPOCH = 311,
-         PRED_CLUSTERING = False,
          weighted_bboxes = True,
-         eps=50,
+         eps=None,
          show_predictions = True):
 
     rpn_score_thresh = rpn_score_thresh
@@ -29,11 +27,24 @@ def eval(item_list,
     item_list = item_list
     MODEL_TYPE = MODEL_TYPE
 
+    if eps is not None:
+        PRED_CLUSTERING = True
+
+    if background_classes is None: # populate common background classes
+        background_classes = ['', ' ', 'background']
+
+    if (len(background_classes) + len(item_list)) < 10: # if there are very few background classes, add in some common backgrounds
+        common_backgrounds = ['tree', 'grass', 'sky', 'building', 'road', 'water', 'beach', 'cloud'] # these are some common themes I have found
+        for bg in common_backgrounds:
+            if bg not in item_list:
+                background_classes.append(bg)
+
+
     with torch.no_grad():
 
         # tokenize item list for CLIP
-        if item_list[0] != ' ':
-             item_list.insert(0,' ')
+        if item_list[0] != 'background':
+             item_list.insert(0,'background')
 
         CHECKPOINT_NAME = WEIGHTS_NAME
         checkpoint = torch.load(CHECKPOINT_NAME)
@@ -82,16 +93,18 @@ def eval(item_list,
                 image_out, box_list = evaluate_custom(image.unsqueeze(0),
                                             item_list,
                                             preds,
+                                            background_classes,
                                             iou_thresh,
                                             conf_thresh,
                                             weighted=weighted_bboxes,
                                             eps=eps,
-                                            show = show_predictions
+                                            show = show_predictions,
                                             )
             else:
                 image_out, box_list = evaluate(image.unsqueeze(0),
                                      item_list,
                                      preds,
+                                     background_classes,
                                      iou_thresh,
                                      conf_thresh,
                                      show = show_predictions)

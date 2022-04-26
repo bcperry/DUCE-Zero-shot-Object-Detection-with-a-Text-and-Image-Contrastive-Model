@@ -588,7 +588,7 @@ def draw_text(img, text,
     return img
 
 
-def plot_image(image, boxes, class_labels, show = True):
+def plot_image(image, boxes, class_labels, background_classes = ['', ' ', 'background'], show = True):
     cmap = plt.get_cmap("tab20b")
     colors = [cmap(i) for i in np.linspace(0, 1, len(class_labels))]
     im = np.array(image)
@@ -600,27 +600,31 @@ def plot_image(image, boxes, class_labels, show = True):
     for box in boxes:
         assert len(box) == 6, "box should contain class pred, confidence, x, y, width, height"
         class_pred = box[0]
-        class_conf = np.round(box[1],2)
-        box = box[2:]
-        upper_left_x = int(box[0])
-        upper_left_y = int(box[1])
-        w = int(box[2] - box[0])
-        h = int(box[3] - box[1])
-        bottom_right_x = upper_left_x + w
-        bottom_right_y = upper_left_y + h
+        if class_labels[int(class_pred)] not in background_classes: # do not show background classes
+            class_conf = np.round(box[1],2)
+            box = box[2:]
+            upper_left_x = int(box[0])
+            upper_left_y = int(box[1])
+            w = int(box[2] - box[0])
+            h = int(box[3] - box[1])
+            bottom_right_x = upper_left_x + w
+            bottom_right_y = upper_left_y + h
 
-        im = cv2.rectangle(im,
-                           (upper_left_x, upper_left_y),
-                           (bottom_right_x, bottom_right_y),
-                           thickness=2,
-                           color=colors[int(class_pred)],
-                           )
 
-        im = draw_text(im,
-                         text=class_labels[int(class_pred)] + ": " + str(class_conf),
-                         pos=(upper_left_x, upper_left_y),
-                         text_color_bg=colors[int(class_pred)],
-                         )
+            im = cv2.rectangle(im,
+                               (upper_left_x, upper_left_y),
+                               (bottom_right_x, bottom_right_y),
+                               thickness=int(0.01*height),
+                               color=colors[int(class_pred)],
+                               )
+
+            im = draw_text(im,
+                             text=class_labels[int(class_pred)] + ": " + str(class_conf),
+                             pos=(upper_left_x, upper_left_y),
+                             text_color_bg=colors[int(class_pred)],
+                             font_scale= int(0.002*height),
+                             font_thickness= int(0.002*height),
+                             )
 
     if show:
         cv2.imshow('img', im)
@@ -683,7 +687,7 @@ def plot_image(image, boxes, class_labels, show = True):
 #         plt.close()
 #     return im
 
-def evaluate(image, labels, preds, iou_thresh, conf_thresh, show = True):
+def evaluate(image, labels, preds, iou_thresh, conf_thresh, background_classes, show = True):
 
 
     #organize the output for NMS and plotting
@@ -694,10 +698,10 @@ def evaluate(image, labels, preds, iou_thresh, conf_thresh, show = True):
 
     nms_boxes = non_max_suppression(bboxes, iou_thresh, conf_thresh)
 
-    im = plot_image(image.detach().cpu()[0].permute(1,2,0), nms_boxes, labels, show)
+    im = plot_image(image.detach().cpu()[0].permute(1,2,0), nms_boxes, labels, background_classes, show)
     return im, nms_boxes
 
-def evaluate_custom(image = None, labels = None, preds = None, iou_thresh = 0.2, conf_thresh = 0.8, show = True, weighted=True, eps=50):
+def evaluate_custom(image, labels, preds, background_classes, iou_thresh = 0.2, conf_thresh = 0.8, show = True, weighted=True, eps=50):
 
     import pandas as pd
 
@@ -722,7 +726,7 @@ def evaluate_custom(image = None, labels = None, preds = None, iou_thresh = 0.2,
     for box in bboxes:
         box.pop(2)
         final_box_list.append(box)
-    im = plot_image(image.detach().cpu()[0].permute(1, 2, 0), final_box_list, labels, show)
+    im = plot_image(image.detach().cpu()[0].permute(1, 2, 0), final_box_list, labels, background_classes, show)
 
     return im, final_box_list
 
