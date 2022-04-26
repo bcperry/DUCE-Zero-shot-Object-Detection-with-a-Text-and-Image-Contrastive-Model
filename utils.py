@@ -622,8 +622,8 @@ def plot_image(image, boxes, class_labels, background_classes = ['', ' ', 'backg
                              text=class_labels[int(class_pred)] + ": " + str(class_conf),
                              pos=(upper_left_x, upper_left_y),
                              text_color_bg=colors[int(class_pred)],
-                             font_scale= int(0.002*height),
-                             font_thickness= int(0.002*height),
+                             font_scale= (1 if int(0.002*height)==0 else int(0.002*height)),
+                             font_thickness= (1 if int(0.002*height)==0 else int(0.002*height)),
                              )
 
     if show:
