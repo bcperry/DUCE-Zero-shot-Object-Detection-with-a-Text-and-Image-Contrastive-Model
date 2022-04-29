@@ -6,7 +6,7 @@ import os
 import matplotlib.pyplot as plt
 from PIL import Image
 import skimage
-from utils import evaluate, evaluate_custom
+from util import evaluate, evaluate_custom
 import torchvision.transforms as transforms
 
 def eval(item_list,
@@ -29,12 +29,14 @@ def eval(item_list,
 
     if eps is not None:
         PRED_CLUSTERING = True
+    else:
+        PRED_CLUSTERING = False
 
     if background_classes is None: # populate common background classes
         background_classes = ['', ' ', 'background']
 
     if (len(background_classes) + len(item_list)) < 10: # if there are very few background classes, add in some common backgrounds
-        common_backgrounds = ['tree', 'grass', 'sky', 'building', 'road', 'water', 'beach', 'cloud'] # these are some common themes I have found
+        common_backgrounds = ['', ' ', 'background', 'tree', 'grass', 'sky', 'building', 'road', 'water', 'beach', 'cloud'] # these are some common themes I have found
         for bg in common_backgrounds:
             if bg not in item_list:
                 background_classes.append(bg)

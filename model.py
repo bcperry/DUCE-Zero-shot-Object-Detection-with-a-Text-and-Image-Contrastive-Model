@@ -10,7 +10,7 @@ from torch import nn
 from PIL import Image
 from torch import Tensor
 
-from utils import FeatureExtractor
+from util import FeatureExtractor
 
 from torchvision.models.detection.rpn import AnchorGenerator
 

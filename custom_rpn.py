@@ -8,7 +8,7 @@ from torch import nn, Tensor
 import warnings
 from typing import Tuple, List, Dict, Optional, Union
 import torch.nn.functional as F
-from utils import average_bboxes
+from util import average_bboxes
 
 class ZeroShotOD(nn.Module):
     """

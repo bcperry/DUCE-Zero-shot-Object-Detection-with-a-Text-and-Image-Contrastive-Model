@@ -12,7 +12,7 @@ session = fo.launch_app(fo_dataset)
 
 # Import functions from the torchvision references we cloned
 from engine import train_one_epoch, evaluate
-import utils
+import util
 
 
 

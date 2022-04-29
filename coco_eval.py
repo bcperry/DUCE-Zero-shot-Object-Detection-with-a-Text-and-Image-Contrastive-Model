@@ -4,7 +4,7 @@ from contextlib import redirect_stdout
 
 import numpy as np
 import torch
-import utils
+import util
 from pycocotools.coco import COCO
 from pycocotools.cocoeval import COCOeval
 
