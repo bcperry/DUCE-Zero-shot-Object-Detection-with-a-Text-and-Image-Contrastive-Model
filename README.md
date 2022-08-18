@@ -38,6 +38,8 @@
     |--- .gitignore
     |--- .getattributes
 ```
-* Due to the size of model .pt and .pth files, we opted to create a parent directory in which the model files were stored. This repo sits at the root of that directory as well.
+\* Due to the size of model .pt and .pth files, we opted to create a parent directory in which the model files were stored. This repo sits at the root of that directory as well.
+
 ** These model files can be replaced with your own trained model files. They are available for download at ...
+
 *** This is the root of the repository
