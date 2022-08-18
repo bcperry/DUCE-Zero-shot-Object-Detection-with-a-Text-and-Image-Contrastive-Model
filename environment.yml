@@ -28,3 +28,4 @@ dependencies:
     - ipykernel
     - "git+https://github.com/bcperry/cocoapi_windows.git#subdirectory=PythonAPI"
     - seaborn
+    - icrawler
